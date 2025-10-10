@@ -1,0 +1,27 @@
+/* ===== Global / tokens ===== */
+@layer base {
+  html { font-family: theme('fontFamily.sans'); }
+  body { @apply bg-gray-50 text-gray-900; }
+  h1,h2,h3 { @apply font-semibold; }
+}
+
+/* ===== Componentes utilitarios ===== */
+@layer components {
+  .btn { @apply inline-flex items-center justify-center px-3 py-2 rounded-xl border shadow-sm transition; }
+  .btn-primary { @apply bg-brand-600 text-white border-brand-600 hover:bg-brand-700; }
+  .btn-ghost { @apply border-gray-300 bg-white hover:bg-gray-100; }
+  .btn-success { @apply bg-accent-600 text-white border-accent-600 hover:bg-accent-600/90; }
+
+  .card { @apply bg-white rounded-2xl shadow-card p-4 md:p-6; }
+
+  .table th { @apply text-left px-3 py-2 font-medium bg-gray-100; }
+  .table td { @apply px-3 py-2 align-top border-b last:border-b-0; }
+}
+
+/* ===== Utilidades opcionales ===== */
+@layer utilities {
+  .badge { @apply px-2 py-1 rounded-lg text-xs; }
+  .badge-warn { @apply bg-amber-100 text-amber-800; }
+  .badge-ok { @apply bg-emerald-100 text-emerald-800; }
+  .badge-danger { @apply bg-red-100 text-red-800; }
+}
