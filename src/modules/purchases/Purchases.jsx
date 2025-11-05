@@ -4,11 +4,10 @@ import Table from "../../components/Table";
 import supabase from "../../lib/supabaseClient";
 import SupplierSpendBar from "../../components/charts/SupplierSpendBar";
 
-// ================== Helpers de formato/fechas ==================
+// ================== Helpers ==================
 const currency = (n) =>
   new Intl.NumberFormat("es-PE", { style: "currency", currency: "PEN" }).format(Number(n || 0));
 
-// Genera YYYY-MM-DD respetando zona horaria local
 const localISODate = (d = new Date()) => {
   const tz = d.getTimezoneOffset();
   const local = new Date(d.getTime() - tz * 60_000);
@@ -29,7 +28,6 @@ const nextDay = (iso) => {
   return localISODate(d);
 };
 
-// Formatea YYYY-MM-DD → dd/mm/yyyy (sin shifts de huso)
 const fmtDate = (iso) => {
   if (!iso) return "—";
   if (/^\d{4}-\d{2}-\d{2}$/.test(iso)) {
@@ -63,6 +61,58 @@ export default function Purchases() {
   const emptyForm = { sku: "", name: "", unit: "und", lastCost: 0 };
   const [form, setForm] = useState(emptyForm);
 
+  // ======= Modo de agregado (unitario / juego) =======
+  const [addMode, setAddMode] = useState("unit"); // "unit" | "kit"
+
+  // ======= Kit inline (sin modal) =======
+  const [kitName, setKitName] = useState("");
+  const [kitQty, setKitQty] = useState(1); // nº de juegos a comprar
+  // líneas del kit: {id, productId, qtyPerKit}
+  const [kitLines, setKitLines] = useState([]);
+  const resetKit = () => {
+    setKitName("");
+    setKitQty(1);
+    setKitLines([]);
+  };
+  const addKitLine = () => {
+    if (!supplierId) return alert("Selecciona proveedor.");
+    setKitLines((prev) => [
+      ...prev,
+      { id: crypto.randomUUID(), productId: "", qtyPerKit: 1 },
+    ]);
+  };
+  const updateKitLine = (id, patch) =>
+    setKitLines((prev) => prev.map((l) => (l.id === id ? { ...l, ...patch } : l)));
+  const removeKitLine = (id) => setKitLines((prev) => prev.filter((l) => l.id !== id));
+
+  const confirmKitToDraft = () => {
+    if (!kitName.trim()) return alert("Ponle un nombre al juego.");
+    const nKits = Math.max(1, toNum(kitQty));
+    if (kitLines.length === 0) return alert("Agrega al menos un componente.");
+    for (const l of kitLines) {
+      if (!l.productId) return alert("Hay una línea sin producto.");
+      if (toNum(l.qtyPerKit) <= 0) return alert("Cantidad por juego inválida.");
+    }
+
+    const groupId = crypto.randomUUID();
+    const lines = kitLines.map((l) => {
+      const p = products.find((x) => String(x.id) === String(l.productId));
+      const qty = nKits * toNum(l.qtyPerKit);
+      return {
+        id: crypto.randomUUID(),
+        productId: p.id,
+        name: `${kitName} · ${p.sku} – ${p.name}`,
+        qty,
+        unitCost: toNum(p.last_cost) || 0, // usa el último costo
+        _group: groupId,
+      };
+    });
+
+    setDraft((prev) => [...prev, ...lines]);
+    resetKit();
+    setAddMode("unit");
+  };
+
   // ======= Borrador de compra =======
   const [draft, setDraft] = useState([]);
   const draftSubtotal = useMemo(
@@ -70,7 +120,7 @@ export default function Purchases() {
     [draft]
   );
 
-  // Subtotal real (gasto real) — editable por el usuario
+  // Subtotal real (gasto real)
   const [realSubtotal, setRealSubtotal] = useState(0);
   const [realTouched, setRealTouched] = useState(false);
   useEffect(() => {
@@ -82,7 +132,7 @@ export default function Purchases() {
     [draftSubtotal, realSubtotal]
   );
 
-  // N° de factura (cabecera de la compra)
+  // N° de factura
   const [invoiceNo, setInvoiceNo] = useState("");
 
   // Cantidad por fila en la lista de productos
@@ -148,9 +198,11 @@ export default function Purchases() {
     setInlineEdit({});
     setRealTouched(false);
     setRealSubtotal(0);
+    resetKit();
+    setAddMode("unit");
   }, [supplierId]); // eslint-disable-line
 
-  // ========== Historial de compras (filtra por proveedor EN compra y EN producto) ==========
+  // ========== Historial de compras ==========
   const fetchHistory = async () => {
     if (!supplierId) return;
     setLoading(true);
@@ -162,8 +214,8 @@ export default function Purchases() {
         purchase:purchases(id, issued_at, supplier_id, total, invoice_no),
         product:products(id, supplier_id, sku, name, unit, last_cost)
       `)
-      .eq("purchase.supplier_id", supplierId)   // compra del proveedor
-      .eq("product.supplier_id", supplierId)    // producto del MISMO proveedor ✅
+      .eq("purchase.supplier_id", supplierId)
+      .eq("product.supplier_id", supplierId)
       .gte("purchase.issued_at", dateFrom)
       .lt("purchase.issued_at", nextDay(dateTo))
       .order("issued_at", { ascending: false, foreignTable: "purchases" });
@@ -356,13 +408,13 @@ export default function Purchases() {
     alert("Compra registrada.");
   };
 
-  // ======= Filtro defensivo en UI por si hay datos inconsistentes =======
+  // ======= Filtro defensivo =======
   const historyFiltered = useMemo(
     () => (history ?? []).filter((it) => it.product?.supplier_id === supplierId),
     [history, supplierId]
   );
 
-  // ======= KPIs / Resúmenes (derivan de historyFiltered) =======
+  // ======= KPIs =======
   const totalSpent = useMemo(() => {
     const seen = new Set();
     let sum = 0;
@@ -441,156 +493,281 @@ export default function Purchases() {
 
       {/* SECCIÓN 2: ZONA DE ACCIÓN - CREAR NUEVA COMPRA */}
       <div className="mb-8">
-        <h2 className="text-xl font-semibold border-b pb-2 mb-4">
-          Registrar Nueva Compra
-        </h2>
+        <h2 className="text-xl font-semibold border-b pb-2 mb-4">Registrar Nueva Compra</h2>
 
         <div className="border rounded-xl p-3 mb-6 bg-white">
-          <div className="font-medium mb-2">Nuevo producto para este proveedor</div>
-          <div className="grid md:grid-cols-6 gap-3">
-            <label className="flex flex-col">
-              <span className="text-xs text-gray-500">SKU</span>
-              <input
-                className="border rounded-xl px-3 py-2"
-                value={form.sku}
-                onChange={(e) => setForm((f) => ({ ...f, sku: e.target.value }))}
-                placeholder="Código"
-              />
-            </label>
+          {/* Tipo de agregado */}
+          <div className="grid md:grid-cols-6 gap-3 mb-3">
             <label className="flex flex-col md:col-span-2">
-              <span className="text-xs text-gray-500">Nombre</span>
-              <input
+              <span className="text-xs text-gray-500">Tipo de agregado</span>
+              <select
                 className="border rounded-xl px-3 py-2"
-                value={form.name}
-                onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-                placeholder="Nombre del producto"
-              />
-            </label>
-            <label className="flex flex-col">
-              <span className="text-xs text-gray-500">Unidad</span>
-              <input
-                className="border rounded-xl px-3 py-2"
-                value={form.unit}
-                onChange={(e) => setForm((f) => ({ ...f, unit: e.target.value }))}
-                placeholder="und / caja / pack"
-              />
-            </label>
-            <label className="flex flex-col">
-              <span className="text-xs text-gray-500">Últ. costo</span>
-              <input
-                type="number"
-                step="0.01"
-                className="border rounded-xl px-3 py-2"
-                value={form.lastCost}
-                onChange={(e) => setForm((f) => ({ ...f, lastCost: e.target.value }))}
-                placeholder="0.00"
-              />
-            </label>
-            <div className="flex items-end gap-2">
-              <button
-                onClick={saveProduct}
-                className="px-3 py-2 rounded-xl bg-emerald-600 text-white disabled:opacity-60"
-                disabled={loading || !supplierId}
+                value={addMode}
+                onChange={(e) => setAddMode(e.target.value)}
               >
-                Guardar producto
-              </button>
-              <button
-                onClick={() => setForm(emptyForm)}
-                className="px-3 py-2 rounded-xl border"
-                disabled={loading}
-              >
-                Limpiar
-              </button>
-            </div>
+                <option value="unit">Unitario</option>
+                <option value="kit">Juego (kit)</option>
+              </select>
+            </label>
           </div>
-        </div>
 
-        <div className="font-medium mb-2">Productos del proveedor</div>
-        <Table
-          columns={[
-            { key: "sku", label: "SKU" },
-            { key: "name", label: "Nombre" },
-            { key: "unit", label: "Unidad" },
-            {
-              key: "last_cost",
-              label: "Últ. costo",
-              render: (r) =>
-                inlineEdit[r.id] !== undefined ? (
+          {/* Si es unitario: formulario de producto (crear) */}
+          {addMode === "unit" && (
+            <>
+              <div className="font-medium mb-2">Nuevo producto para este proveedor</div>
+              <div className="grid md:grid-cols-6 gap-3">
+                <label className="flex flex-col">
+                  <span className="text-xs text-gray-500">SKU</span>
+                  <input
+                    className="border rounded-xl px-3 py-2"
+                    value={form.sku}
+                    onChange={(e) => setForm((f) => ({ ...f, sku: e.target.value }))}
+                    placeholder="Código"
+                  />
+                </label>
+                <label className="flex flex-col md:col-span-2">
+                  <span className="text-xs text-gray-500">Nombre</span>
+                  <input
+                    className="border rounded-xl px-3 py-2"
+                    value={form.name}
+                    onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+                    placeholder="Nombre del producto"
+                  />
+                </label>
+                <label className="flex flex-col">
+                  <span className="text-xs text-gray-500">Unidad</span>
+                  <input
+                    className="border rounded-xl px-3 py-2"
+                    value={form.unit}
+                    onChange={(e) => setForm((f) => ({ ...f, unit: e.target.value }))}
+                    placeholder="und / caja / pack"
+                  />
+                </label>
+                <label className="flex flex-col">
+                  <span className="text-xs text-gray-500">Últ. costo</span>
                   <input
                     type="number"
                     step="0.01"
-                    className="border rounded-lg px-2 py-1 w-28"
-                    value={inlineEdit[r.id]}
-                    onChange={(e) =>
-                      setInlineEdit((prev) => ({
-                        ...prev,
-                        [r.id]: e.target.value,
-                      }))
-                    }
+                    className="border rounded-xl px-3 py-2"
+                    value={form.lastCost}
+                    onChange={(e) => setForm((f) => ({ ...f, lastCost: e.target.value }))}
+                    placeholder="0.00"
                   />
-                ) : (
-                  currency(r.last_cost)
-                ),
-            },
-            {
-              key: "qtyToAdd",
-              label: "Cantidad",
-              render: (r) => (
-                <input
-                  type="number"
-                  min={1}
-                  className="border rounded-lg px-2 py-1 w-20"
-                  value={rowQty[r.id] ?? 1}
-                  onChange={(e) =>
-                    setRowQty((prev) => ({
-                      ...prev,
-                      [r.id]: e.target.value,
-                    }))
-                  }
-                />
-              ),
-            },
-            {
-              key: "acciones",
-              label: "Acciones",
-              render: (r) => (
-                <div className="flex gap-2">
-                  <button onClick={() => addFromProduct(r)} className="px-2 py-1 rounded-lg border">
-                    Agregar
-                  </button>
-                  {inlineEdit[r.id] === undefined ? (
-                    <button onClick={() => startEdit(r)} className="px-2 py-1 rounded-lg border">
-                      Editar
-                    </button>
-                  ) : (
-                    <>
-                      <button
-                        onClick={() => saveEditCost(r)}
-                        className="px-2 py-1 rounded-lg border bg-emerald-600 text-white"
-                        disabled={loading}
-                      >
-                        Guardar
-                      </button>
-                      <button onClick={() => cancelEdit(r.id)} className="px-2 py-1 rounded-lg border">
-                        Cancelar
-                      </button>
-                    </>
-                  )}
+                </label>
+                <div className="flex items-end gap-2">
                   <button
-                    onClick={() => removeProduct(r.id)}
-                    className="px-2 py-1 rounded-lg border text-red-600"
+                    onClick={saveProduct}
+                    className="px-3 py-2 rounded-xl bg-emerald-600 text-white disabled:opacity-60"
+                    disabled={loading || !supplierId}
                   >
-                    Eliminar
+                    Guardar producto
+                  </button>
+                  <button
+                    onClick={() => setForm(emptyForm)}
+                    className="px-3 py-2 rounded-xl border"
+                    disabled={loading}
+                  >
+                    Limpiar
                   </button>
                 </div>
-              ),
-            },
-          ]}
-          rows={products}
-          keyField="id"
-          loading={loading}
-          emptyMessage="Sin productos para este proveedor"
-        />
+              </div>
+            </>
+          )}
+
+          {/* Si es kit: armador inline */}
+          {addMode === "kit" && (
+            <div className="space-y-3">
+              <div className="font-medium">Armar juego (kit)</div>
+              <div className="grid md:grid-cols-3 gap-3">
+                <label className="flex flex-col">
+                  <span className="text-xs text-gray-500">Nombre del juego</span>
+                  <input
+                    className="border rounded-xl px-3 py-2"
+                    value={kitName}
+                    onChange={(e) => setKitName(e.target.value)}
+                    placeholder="Ejm: JUEGO DE OLLAS"
+                  />
+                </label>
+                <label className="flex flex-col">
+                  <span className="text-xs text-gray-500">Cantidad de juegos</span>
+                  <input
+                    type="number"
+                    min={1}
+                    className="border rounded-xl px-3 py-2"
+                    value={kitQty}
+                    onChange={(e) => setKitQty(e.target.value)}
+                  />
+                </label>
+                <div className="flex items-end">
+                  <button onClick={addKitLine} className="px-3 py-2 rounded-xl border w-full">
+                    Agregar componente
+                  </button>
+                </div>
+              </div>
+
+              {kitLines.length === 0 ? (
+                <div className="text-gray-500 text-sm">
+                  Agrega componentes con el botón “Agregar componente”.
+                </div>
+              ) : (
+                <Table
+                  columns={[
+                    {
+                      key: "product",
+                      label: "Producto",
+                      render: (r) => (
+                        <select
+                          className="border rounded-lg px-2 py-1 w-full"
+                          value={r.productId}
+                          onChange={(e) => updateKitLine(r.id, { productId: e.target.value })}
+                        >
+                          <option value="">— seleccionar —</option>
+                          {products.map((p) => (
+                            <option key={p.id} value={p.id}>
+                              {p.sku} – {p.name}
+                            </option>
+                          ))}
+                        </select>
+                      ),
+                    },
+                    {
+                      key: "qtyPerKit",
+                      label: "Cant. por juego",
+                      render: (r) => (
+                        <input
+                          type="number"
+                          min={1}
+                          value={r.qtyPerKit}
+                          onChange={(e) => updateKitLine(r.id, { qtyPerKit: e.target.value })}
+                          className="border rounded-lg px-2 py-1 w-28"
+                        />
+                      ),
+                    },
+                    {
+                      key: "rm",
+                      label: "",
+                      render: (r) => (
+                        <button
+                          onClick={() => removeKitLine(r.id)}
+                          className="px-2 py-1 rounded-lg border text-red-600"
+                        >
+                          Quitar
+                        </button>
+                      ),
+                    },
+                  ]}
+                  rows={kitLines}
+                  keyField="id"
+                />
+              )}
+
+              <div className="flex justify-end gap-2">
+                <button onClick={resetKit} className="px-3 py-2 rounded-xl border">
+                  Limpiar
+                </button>
+                <button
+                  onClick={confirmKitToDraft}
+                  className="px-3 py-2 rounded-xl bg-emerald-600 text-white"
+                  disabled={kitLines.length === 0}
+                >
+                  Agregar juego al borrador
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Lista de productos solo si el modo es unitario */}
+        {addMode === "unit" && (
+          <>
+            <div className="font-medium mb-2">Productos del proveedor</div>
+            <Table
+              columns={[
+                { key: "sku", label: "SKU" },
+                { key: "name", label: "Nombre" },
+                { key: "unit", label: "Unidad" },
+                {
+                  key: "last_cost",
+                  label: "Últ. costo",
+                  render: (r) =>
+                    inlineEdit[r.id] !== undefined ? (
+                      <input
+                        type="number"
+                        step="0.01"
+                        className="border rounded-lg px-2 py-1 w-28"
+                        value={inlineEdit[r.id]}
+                        onChange={(e) =>
+                          setInlineEdit((prev) => ({
+                            ...prev,
+                            [r.id]: e.target.value,
+                          }))
+                        }
+                      />
+                    ) : (
+                      currency(r.last_cost)
+                    ),
+                },
+                {
+                  key: "qtyToAdd",
+                  label: "Cantidad",
+                  render: (r) => (
+                    <input
+                      type="number"
+                      min={1}
+                      className="border rounded-lg px-2 py-1 w-20"
+                      value={rowQty[r.id] ?? 1}
+                      onChange={(e) =>
+                        setRowQty((prev) => ({
+                          ...prev,
+                          [r.id]: e.target.value,
+                        }))
+                      }
+                    />
+                  ),
+                },
+                {
+                  key: "acciones",
+                  label: "Acciones",
+                  render: (r) => (
+                    <div className="flex gap-2">
+                      <button onClick={() => addFromProduct(r)} className="px-2 py-1 rounded-lg border">
+                        Agregar
+                      </button>
+                      {inlineEdit[r.id] === undefined ? (
+                        <button onClick={() => startEdit(r)} className="px-2 py-1 rounded-lg border">
+                          Editar
+                        </button>
+                      ) : (
+                        <>
+                          <button
+                            onClick={() => saveEditCost(r)}
+                            className="px-2 py-1 rounded-lg border bg-emerald-600 text-white"
+                            disabled={loading}
+                          >
+                            Guardar
+                          </button>
+                          <button onClick={() => cancelEdit(r.id)} className="px-2 py-1 rounded-lg border">
+                            Cancelar
+                          </button>
+                        </>
+                      )}
+                      <button
+                        onClick={() => removeProduct(r.id)}
+                        className="px-2 py-1 rounded-lg border text-red-600"
+                      >
+                        Eliminar
+                      </button>
+                    </div>
+                  ),
+                },
+              ]}
+              rows={products}
+              keyField="id"
+              loading={loading}
+              emptyMessage="Sin productos para este proveedor"
+            />
+          </>
+        )}
 
         {draft.length > 0 && (
           <div className="mt-8">
@@ -722,8 +899,7 @@ export default function Purchases() {
 
         <div className="mb-6">
           <div className="font-medium mb-2">Gasto total por proveedor (general)</div>
-          {/* Si quieres filtrar esta barra por el proveedor seleccionado, añade supplierId en el componente y filtra allí */}
-          <SupplierSpendBar dateFrom={dateFrom} dateTo={dateTo} /* supplierId={supplierId} */ />
+          <SupplierSpendBar dateFrom={dateFrom} dateTo={dateTo} />
         </div>
 
         <div className="mb-8">
