@@ -3,7 +3,7 @@ import React from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import ProtectedRoute from "../components/ProtectedRoute";
 
-// Páginas / módulos
+// (ya no usamos Layout para ninguna ruta)
 import Home from "../modules/home/Home";
 import Login from "../modules/auth/Login";
 
@@ -19,10 +19,7 @@ import Products from "../modules/products/Products";
 import Rewards from "../modules/rewards/Premios";
 import UsersAccess from "../modules/config/UsersAccess";
 
-/**
- * Wrappers de compatibilidad: varias pantallas fueron creadas para App.jsx y esperan props.
- * Mientras migramos a router, las envolvemos con props mínimas para evitar errores TS.
- */
+/** Wrappers de compatibilidad (props mínimos) */
 const SalesPage        = () => <Sales        {...({} as any)} />;
 const ReceivablesPage  = () => <Receivables  {...({} as any)} />;
 const PurchasesPage    = () => <Purchases    {...({} as any)} />;
@@ -38,13 +35,13 @@ const UsersAccessPage  = () => <UsersAccess />;
 export default function AppRoutes() {
   return (
     <Routes>
-      {/* Raíz: manda al Home (si no hay sesión, ProtectedRoute mostrará login link/bloqueo según tu implementación) */}
+      {/* Raíz -> Home */}
       <Route path="/" element={<Navigate to="/home" replace />} />
 
-      {/* Login público */}
+      {/* Público */}
       <Route path="/login" element={<Login />} />
 
-      {/* Home (solo requiere sesión, no un permiso de módulo) */}
+      {/* Home */}
       <Route
         path="/home"
         element={
@@ -54,7 +51,7 @@ export default function AppRoutes() {
         }
       />
 
-      {/* Módulos protegidos por permiso */}
+      {/* Todas las rutas SIN Layout (evita doble barra) */}
       <Route
         path="/sales"
         element={
@@ -144,7 +141,7 @@ export default function AppRoutes() {
         }
       />
 
-      {/* Aliases en español -> redirecciones a rutas canónicas */}
+      {/* Aliases en español */}
       <Route path="/ventas"        element={<Navigate to="/sales" replace />} />
       <Route path="/cobros"        element={<Navigate to="/receivables" replace />} />
       <Route path="/compras"       element={<Navigate to="/purchases" replace />} />
