@@ -57,7 +57,7 @@ async function createServiceContracts({ supabase, clientId, saleId, items, start
     const isAnnual = p?.serviceIsAnnual ?? p?.service_is_annual;
     if (!isAnnual) continue;
 
-    const months = Number(p?.serviceIntervalMonths ?? p?.service_interval_months ?? 12);
+    const months = Number(p?.serviceIntervalMonths ?? p?.service_interval_months ?? 8);
     const qty = Math.max(1, Math.floor(toN(it.qty)));
 
     const d = new Date(start);
