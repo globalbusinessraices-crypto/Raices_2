@@ -7,9 +7,11 @@ export type Role = "manager" | "secretary";
 
 /** Claves de módulos (UI) */
 export type ModuleKey =
+  | "summary"        // 👈 NUEVO: Resumen General
   | "sales"
   | "receivables"
   | "purchases"
+  | "expenses"
   | "inventory"
   | "services"
   | "maintenance"
@@ -25,6 +27,7 @@ const PERMS_TABLE = "user_module_permissions";
 
 /** Catálogo completo para gerencia */
 const ALL_MODULES: ModuleKey[] = [
+  "summary",      // 👈 NUEVO
   "sales",
   "receivables",
   "purchases",
@@ -102,7 +105,9 @@ export default function usePerms() {
       (rows ?? [])
         .map((r) => r.module_key)
         // seguridad: solo claves válidas
-        .filter((k): k is ModuleKey => (ALL_MODULES as string[]).includes(k as string))
+        .filter((k): k is ModuleKey =>
+          (ALL_MODULES as string[]).includes(k as string)
+        )
         .sort() || [];
 
     setModules(mods);
@@ -121,7 +126,8 @@ export default function usePerms() {
 
   /** Helper de autorización por módulo */
   const can = useCallback(
-    (module: ModuleKey) => (role === "manager" ? true : modules.includes(module)),
+    (module: ModuleKey) =>
+      role === "manager" ? true : modules.includes(module),
     [role, modules]
   );
 
