@@ -34,7 +34,6 @@ export default function Clients() {
   // ---- Cargar clientes
   const fetchClients = async () => {
     setLoading(true);
-    // Incluimos birthdate (debe existir en la tabla)
     const { data, error } = await supabase
       .from("clients")
       .select("id, name, tipo, telefono, email, dni, ruc, direccion, birthdate")
@@ -49,7 +48,7 @@ export default function Clients() {
     fetchClients();
   }, []);
 
-  // Conteos para los chips del filtro
+  // Conteos para chips
   const counts = useMemo(() => {
     const total = rows.length;
     let normal = 0;
@@ -65,13 +64,12 @@ export default function Clients() {
   // ---- Filtros de búsqueda + tipo
   const filtered = useMemo(() => {
     const term = q.trim().toLowerCase();
-
     return rows.filter((r) => {
-      // filtro por tipo
+      // tipo
       const t = (r.tipo || "normal").toLowerCase();
       if (tipoFilter !== "todos" && t !== tipoFilter) return false;
 
-      // filtro por texto
+      // texto
       if (!term) return true;
       return [
         r.name,
@@ -111,12 +109,8 @@ export default function Clients() {
   const isValid = () => {
     if (!form.name.trim()) return false;
     if (!(form.tipo === "normal" || form.tipo === "distribuidor")) return false;
-
-    // normal ⇒ DNI obligatorio; distribuidor ⇒ RUC obligatorio
     if (form.tipo === "normal" && !isDNI(form.dni)) return false;
     if (form.tipo === "distribuidor" && !isRUC(form.ruc)) return false;
-
-    // si es distribuidor, birthdate es opcional (puedes volverlo obligatorio si quieres)
     return true;
   };
 
@@ -142,7 +136,6 @@ export default function Clients() {
       dni: form.tipo === "normal" ? form.dni.trim() : norm(form.dni),
       ruc: form.tipo === "distribuidor" ? form.ruc.trim() : norm(form.ruc),
       direccion: norm(form.direccion),
-      // birthdate solo para distribuidores; para normal => null
       birthdate: form.tipo === "distribuidor" ? norm(form.birthdate) : null,
     };
 
@@ -180,29 +173,23 @@ export default function Clients() {
   };
 
   const chipClass = (key) =>
-    `px-3 py-1 rounded-xl text-sm ${
-      tipoFilter === key ? "bg-gray-900 text-white" : "bg-white border hover:bg-gray-100"
+    `px-3 py-1 rounded-full text-sm transition shadow-sm ${
+      tipoFilter === key
+        ? "bg-gray-900 text-white"
+        : "bg-white border border-slate-200 text-slate-700 hover:bg-slate-50"
     }`;
 
   // ----- Columnas dinámicas -----
   const columns = useMemo(() => {
     const base = [
       { key: "name", label: "Nombre" },
-      // 'Tipo' solo cuando filtro == 'todos'
       ...(tipoFilter === "todos" ? [{ key: "tipo", label: "Tipo" }] : []),
       { key: "dni", label: "DNI" },
       { key: "ruc", label: "RUC" },
       { key: "telefono", label: "Teléfono" },
       { key: "email", label: "Email" },
-      // 'Fecha de nacimiento' solo para filtro 'distribuidor'
       ...(tipoFilter === "distribuidor"
-        ? [
-            {
-              key: "birthdate",
-              label: "F. nacimiento",
-              render: (r) => fmtDate(r.birthdate),
-            },
-          ]
+        ? [{ key: "birthdate", label: "F. nacimiento", render: (r) => fmtDate(r.birthdate) }]
         : []),
       { key: "direccion", label: "Dirección" },
       {
@@ -210,12 +197,12 @@ export default function Clients() {
         label: "Acciones",
         render: (r) => (
           <div className="flex gap-2">
-            <button onClick={() => edit(r)} className="px-2 py-1 rounded-lg border">
+            <button onClick={() => edit(r)} className="px-2 py-1 rounded-lg border hover:bg-slate-50">
               Editar
             </button>
             <button
               onClick={() => remove(r.id)}
-              className="px-2 py-1 rounded-lg border text-red-600"
+              className="px-2 py-1 rounded-lg border text-red-600 hover:bg-red-50"
             >
               Eliminar
             </button>
@@ -228,122 +215,126 @@ export default function Clients() {
 
   return (
     <Section title="Clientes">
-      {/* Formulario */}
-      <div className="grid md:grid-cols-6 gap-3 mb-4">
-        <label className="flex flex-col md:col-span-2">
-          <span className="text-xs text-gray-500">Nombre</span>
-          <input
-            className="border rounded-xl px-3 py-2"
-            value={form.name}
-            onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-            placeholder="Ej: Juan Pérez"
-          />
-        </label>
-
-        <label className="flex flex-col">
-          <span className="text-xs text-gray-500">Tipo</span>
-          <select
-            className="border rounded-xl px-3 py-2"
-            value={form.tipo}
-            onChange={(e) => setForm((f) => ({ ...f, tipo: e.target.value }))}
-          >
-            <option value="normal">normal</option>
-            <option value="distribuidor">distribuidor</option>
-          </select>
-        </label>
-
-        {/* DNI */}
-        <label className="flex flex-col">
-          <span className="text-xs text-gray-500">
-            DNI {form.tipo === "normal" ? "(obligatorio)" : "(opcional)"}
-          </span>
-          <input
-            className="border rounded-xl px-3 py-2"
-            value={form.dni}
-            onChange={(e) => setForm((f) => ({ ...f, dni: e.target.value }))}
-            placeholder="8 dígitos"
-            maxLength={8}
-            inputMode="numeric"
-          />
-        </label>
-
-        {/* RUC */}
-        <label className="flex flex-col">
-          <span className="text-xs text-gray-500">
-            RUC {form.tipo === "distribuidor" ? "(obligatorio)" : "(opcional)"}
-          </span>
-        <input
-            className="border rounded-xl px-3 py-2"
-            value={form.ruc}
-            onChange={(e) => setForm((f) => ({ ...f, ruc: e.target.value }))}
-            placeholder="11 dígitos"
-            maxLength={11}
-            inputMode="numeric"
-          />
-        </label>
-
-        <label className="flex flex-col">
-          <span className="text-xs text-gray-500">Teléfono</span>
-          <input
-            className="border rounded-xl px-3 py-2"
-            value={form.telefono}
-            onChange={(e) => setForm((f) => ({ ...f, telefono: e.target.value }))}
-            placeholder="999999999"
-          />
-        </label>
-
-        <label className="flex flex-col">
-          <span className="text-xs text-gray-500">Email</span>
-          <input
-            type="email"
-            className="border rounded-xl px-3 py-2"
-            value={form.email}
-            onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
-            placeholder="correo@dominio.com"
-          />
-        </label>
-
-        {/* Fecha de nacimiento: SOLO distribuidores */}
-        {form.tipo === "distribuidor" && (
-          <label className="flex flex-col">
-            <span className="text-xs text-gray-500">F. nacimiento </span>
+      {/* FORMULARIO */}
+      <div className="rounded-2xl border border-slate-200 bg-white shadow-sm p-4 mb-4">
+        <div className="grid md:grid-cols-6 gap-3">
+          <label className="flex flex-col md:col-span-2">
+            <span className="text-xs text-gray-500">Nombre</span>
             <input
-              type="date"
               className="border rounded-xl px-3 py-2"
-              value={form.birthdate || ""}
-              onChange={(e) => setForm((f) => ({ ...f, birthdate: e.target.value }))}
+              value={form.name}
+              onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+              placeholder="Ej: Juan Pérez"
             />
           </label>
-        )}
 
-        <label className="flex flex-col md:col-span-2">
-          <span className="text-xs text-gray-500">Dirección</span>
-          <input
-            className="border rounded-xl px-3 py-2"
-            value={form.direccion}
-            onChange={(e) => setForm((f) => ({ ...f, direccion: e.target.value }))}
-            placeholder="Calle, número, distrito"
-          />
-        </label>
+          <label className="flex flex-col">
+            <span className="text-xs text-gray-500">Tipo</span>
+            <select
+              className="border rounded-xl px-3 py-2"
+              value={form.tipo}
+              onChange={(e) => setForm((f) => ({ ...f, tipo: e.target.value }))}
+            >
+              <option value="normal">normal</option>
+              <option value="distribuidor">distribuidor</option>
+            </select>
+          </label>
+
+          {/* DNI */}
+          <label className="flex flex-col">
+            <span className="text-xs text-gray-500">
+              DNI {form.tipo === "normal" ? "(obligatorio)" : "(opcional)"}
+            </span>
+            <input
+              className="border rounded-xl px-3 py-2"
+              value={form.dni}
+              onChange={(e) => setForm((f) => ({ ...f, dni: e.target.value }))}
+              placeholder="8 dígitos"
+              maxLength={8}
+              inputMode="numeric"
+            />
+          </label>
+
+          {/* RUC */}
+          <label className="flex flex-col">
+            <span className="text-xs text-gray-500">
+              RUC {form.tipo === "distribuidor" ? "(obligatorio)" : "(opcional)"}
+            </span>
+            <input
+              className="border rounded-xl px-3 py-2"
+              value={form.ruc}
+              onChange={(e) => setForm((f) => ({ ...f, ruc: e.target.value }))}
+              placeholder="11 dígitos"
+              maxLength={11}
+              inputMode="numeric"
+            />
+          </label>
+
+          <label className="flex flex-col">
+            <span className="text-xs text-gray-500">Teléfono</span>
+            <input
+              className="border rounded-xl px-3 py-2"
+              value={form.telefono}
+              onChange={(e) => setForm((f) => ({ ...f, telefono: e.target.value }))}
+              placeholder="999999999"
+            />
+          </label>
+
+          <label className="flex flex-col">
+            <span className="text-xs text-gray-500">Email</span>
+            <input
+              type="email"
+              className="border rounded-xl px-3 py-2"
+              value={form.email}
+              onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
+              placeholder="correo@dominio.com"
+            />
+          </label>
+
+          {/* Fecha de nacimiento: SOLO distribuidores */}
+          {form.tipo === "distribuidor" && (
+            <label className="flex flex-col">
+              <span className="text-xs text-gray-500">F. nacimiento </span>
+              <input
+                type="date"
+                className="border rounded-xl px-3 py-2"
+                value={form.birthdate || ""}
+                onChange={(e) => setForm((f) => ({ ...f, birthdate: e.target.value }))}
+              />
+            </label>
+          )}
+
+          <label className="flex flex-col md:col-span-2">
+            <span className="text-xs text-gray-500">Dirección</span>
+            <input
+              className="border rounded-xl px-3 py-2"
+              value={form.direccion}
+              onChange={(e) => setForm((f) => ({ ...f, direccion: e.target.value }))}
+              placeholder="Calle, número, distrito"
+            />
+          </label>
+        </div>
+
+        <div className="flex flex-wrap gap-2 mt-4">
+          <button
+            onClick={save}
+            disabled={loading}
+            className="px-4 py-2 rounded-xl bg-emerald-600 text-white disabled:opacity-60"
+          >
+            {form.id ? "Actualizar" : "Guardar"}
+          </button>
+          {form.id && (
+            <button onClick={reset} className="px-4 py-2 rounded-xl border hover:bg-slate-50">
+              Cancelar
+            </button>
+          )}
+        </div>
       </div>
 
-      <div className="flex flex-wrap gap-2 mb-6 items-center">
-        <button
-          onClick={save}
-          disabled={loading}
-          className="px-4 py-2 rounded-xl bg-emerald-600 text-white disabled:opacity-60"
-        >
-          {form.id ? "Actualizar" : "Guardar"}
-        </button>
-        {form.id && (
-          <button onClick={reset} className="px-4 py-2 rounded-xl border">
-            Cancelar
-          </button>
-        )}
-
-        {/* Filtros por tipo */}
-        <div className="ml-auto flex items-center gap-2">
-          <div className="flex gap-1">
+      {/* FILTROS + BUSCADOR */}
+      <div className="rounded-2xl border border-slate-200 bg-white shadow-sm p-3 mb-4">
+        <div className="flex flex-wrap gap-2 items-center">
+          <div className="flex gap-2">
             <button
               className={chipClass("todos")}
               onClick={() => setTipoFilter("todos")}
@@ -367,24 +358,29 @@ export default function Clients() {
             </button>
           </div>
 
-          {/* Buscador */}
-          <input
-            className="border rounded-xl px-3 py-2"
-            placeholder="Buscar…"
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-          />
+          <div className="ml-auto w-full sm:w-64">
+            <input
+              className="border rounded-xl px-3 py-2 w-full"
+              placeholder="Buscar…"
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+            />
+          </div>
         </div>
       </div>
 
-      {/* Tabla */}
-      <Table
-        columns={columns}
-        rows={filtered}
-        keyField="id"
-        loading={loading}
-        emptyMessage="Sin clientes"
-      />
+      {/* TABLA */}
+      <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+        <div className="max-h-[60vh] overflow-auto">
+          <Table
+            columns={columns}
+            rows={filtered}
+            keyField="id"
+            loading={loading}
+            emptyMessage="Sin clientes"
+          />
+        </div>
+      </div>
     </Section>
   );
 }

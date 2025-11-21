@@ -32,7 +32,7 @@ export default function Products({
 
     // Campos de servicio anual (camelCase en el front)
     serviceIsAnnual: false,
-    serviceIntervalMonths: 12,
+    serviceIntervalMonths: 8,
     serviceName: "",
   };
   const [form, setForm] = useState(emptyForm);
@@ -82,7 +82,7 @@ export default function Products({
 
               // mapeo a camelCase para el front
               serviceIsAnnual: !!r.service_is_annual,
-              serviceIntervalMonths: Number(r.service_interval_months ?? 12),
+              serviceIntervalMonths: Number(r.service_interval_months ?? 8),
               serviceName: r.service_name ?? "",
             }))
           );
@@ -148,7 +148,7 @@ export default function Products({
 
         // a snake_case para Supabase
         service_is_annual: !!form.serviceIsAnnual,
-        service_interval_months: Number(form.serviceIntervalMonths || 12),
+        service_interval_months: Number(form.serviceIntervalMonths || 8),
         service_name: form.serviceName?.trim() || null,
       };
 
@@ -179,7 +179,7 @@ export default function Products({
 
         // Servicio anual
         service_is_annual: !!form.serviceIsAnnual,
-        service_interval_months: Number(form.serviceIntervalMonths || 12),
+        service_interval_months: Number(form.serviceIntervalMonths || 8),
         service_name: form.serviceName?.trim() || null,
       };
       const { data, error } = await supabase
@@ -207,7 +207,7 @@ export default function Products({
           lastCost: Number(data.last_cost || 0),
 
           serviceIsAnnual: !!data.service_is_annual,
-          serviceIntervalMonths: Number(data.service_interval_months ?? 12),
+          serviceIntervalMonths: Number(data.service_interval_months ?? 8),
           serviceName: data.service_name ?? "",
         };
         setProducts((prev) => ([...(prev ?? rows), mapped]));
@@ -319,7 +319,7 @@ export default function Products({
                 onChange={(e) =>
                   setForm((f) => ({
                     ...f,
-                    serviceIntervalMonths: Number(e.target.value || 12),
+                    serviceIntervalMonths: Number(e.target.value || 8),
                   }))
                 }
                 disabled={!form.serviceIsAnnual}

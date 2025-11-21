@@ -1,24 +1,24 @@
 // src/app/Layout.tsx
 import React from "react";
 import { NavLink, Outlet, useLocation, Link } from "react-router-dom";
-import usePerms from "./hooks/usePerms";
-
-type ModuleKey =
-  | "sales" | "receivables" | "purchases" | "inventory" | "services"
-  | "maintenance" | "clients" | "suppliers" | "products" | "rewards" | "users";
+import usePerms, { ModuleKey } from "./hooks/usePerms";
 
 const NAV: Array<{ path: string; label: string; perm?: ModuleKey; onlyManager?: boolean }> = [
-  { path: "/sales",        label: "Ventas",         perm: "sales" },
-  { path: "/receivables",  label: "Cobros",         perm: "receivables" },
-  { path: "/purchases",    label: "Compras",        perm: "purchases" },
-  { path: "/inventory",    label: "Inventario",     perm: "inventory" },
-  { path: "/services",     label: "Servicios",      perm: "services" },
-  { path: "/maintenance",  label: "Mantenimiento",  perm: "maintenance" },
-  { path: "/clients",      label: "Clientes",       perm: "clients" },
-  { path: "/suppliers",    label: "Proveedores",    perm: "suppliers" },
-  { path: "/products",     label: "Productos",      perm: "products" },
-  { path: "/rewards",      label: "Premios",        perm: "rewards" },
-  { path: "/users",        label: "Usuarios y permisos", onlyManager: true },
+  // 👇 Nuevo tab de resumen general
+  { path: "/summary",     label: "Resumen general", perm: "summary" },
+
+  { path: "/sales",        label: "Ventas",                perm: "sales" },
+  { path: "/receivables",  label: "Cobros",                perm: "receivables" },
+  { path: "/purchases",    label: "Compras",               perm: "purchases" },
+  { path: "/expenses",     label: "Gastos",                perm: "expenses" },
+  { path: "/inventory",    label: "Inventario",            perm: "inventory" },
+  { path: "/services",     label: "Servicios",             perm: "services" },
+  { path: "/maintenance",  label: "Mantenimiento",         perm: "maintenance" },
+  { path: "/clients",      label: "Clientes",              perm: "clients" },
+  { path: "/suppliers",    label: "Proveedores",           perm: "suppliers" },
+  { path: "/products",     label: "Productos",             perm: "products" },
+  { path: "/rewards",      label: "Premios",               perm: "rewards" },
+  { path: "/users",        label: "Usuarios y permisos",   onlyManager: true },
 ];
 
 export default function Layout() {
@@ -45,11 +45,15 @@ export default function Layout() {
     ].join(" ");
   };
 
-  const onLogout = async () => { try { await signOut?.(); } catch {} };
+  const onLogout = async () => {
+    try {
+      await signOut?.();
+    } catch {}
+  };
 
   return (
     <div className="min-h-screen bg-gray-50 text-gray-900">
-      {/* Header + tabs: visible en TODAS las interfaces, oculto en /home */}
+      {/* Header/tabs SOLO en interfaces (oculto en /home) */}
       {!isHome && (
         <header className="sticky top-0 z-40 border-b bg-white/95 backdrop-blur">
           <div className="mx-auto max-w-7xl px-4 py-3 flex items-center justify-between gap-4">
@@ -62,8 +66,11 @@ export default function Layout() {
                 <div className="-mt-0.5 text-gray-600 text-sm">Global</div>
               </div>
             </Link>
+
             <div className="flex items-center gap-3 text-sm text-gray-600">
-              <span className="hidden sm:inline">Rol: <b>{role}</b></span>
+              <span className="hidden sm:inline">
+                Rol: <b>{role}</b>
+              </span>
               <button
                 onClick={onLogout}
                 className="rounded-lg border px-3 py-1.5 hover:bg-gray-50"
@@ -73,8 +80,12 @@ export default function Layout() {
               </button>
             </div>
           </div>
+
           <div className="border-t">
-            <div className="mx-auto max-w-7xl px-4 py-2 overflow-x-auto" aria-label="Navegación de módulos">
+            <div
+              className="mx-auto max-w-7xl px-4 py-2 overflow-x-auto"
+              aria-label="Navegación de módulos"
+            >
               <nav className="flex items-center gap-2 min-h-[40px]">
                 {visibleNav.map((tab) => (
                   <NavLink key={tab.path} to={tab.path} className={linkClass(tab.path)}>

@@ -46,7 +46,7 @@ const addDaysISO = (days) => {
   return d.toISOString().slice(0, 10);
 };
 
-/* === Crear contratos de servicio (tu lógica existente) === */
+/* === Crear contratos de servicio (misma lógica) === */
 async function createServiceContracts({ supabase, clientId, saleId, items, startDate }) {
   const rows = [];
   const start = startDate || new Date().toISOString().slice(0, 10);
@@ -57,7 +57,7 @@ async function createServiceContracts({ supabase, clientId, saleId, items, start
     const isAnnual = p?.serviceIsAnnual ?? p?.service_is_annual;
     if (!isAnnual) continue;
 
-    const months = Number(p?.serviceIntervalMonths ?? p?.service_interval_months ?? 12);
+    const months = Number(p?.serviceIntervalMonths ?? p?.service_interval_months ?? 8);
     const qty = Math.max(1, Math.floor(toN(it.qty)));
 
     const d = new Date(start);
@@ -104,7 +104,7 @@ const CustomTooltip = ({ active, payload, label }) => {
 ========================================================= */
 function KitConfigModal({ open, onClose, kitProduct, onConfirm, availableStock }) {
   const [loading, setLoading] = useState(false);
-  const [items, setItems] = useState([]); // [{id, qty, group_code, required, component:{id,sku,name,list_cost}}, subs:[{product,qty_ratio}] ]
+  const [items, setItems] = useState([]); // [{id, qty, group_code, required, component:{...}}, subs:[{product,qty_ratio}] ]
   const [qtyKit, setQtyKit] = useState(1);
   const [choice, setChoice] = useState({}); // kit_item_id -> chosen product_id
   const [unitPrice, setUnitPrice] = useState({}); // chosen product_id -> unit price (venta)
@@ -186,8 +186,6 @@ function KitConfigModal({ open, onClose, kitProduct, onConfirm, availableStock }
 
   const totalEst = items.reduce((acc, it) => {
     const chosenId = choice[it.id];
-    const chosenP =
-      it.subs.find((s) => s.product?.id === chosenId)?.product || it.component;
     const ratio =
       chosenId === it.component?.id
         ? 1
@@ -197,138 +195,147 @@ function KitConfigModal({ open, onClose, kitProduct, onConfirm, availableStock }
   }, 0);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-      <div className="bg-white rounded-2xl w-full max-w-3xl p-4">
-        <div className="flex items-center justify-between mb-2">
-          <h3 className="text-lg font-semibold">
-            Configurar kit: {kitProduct?.sku} – {kitProduct?.name}
-          </h3>
-          <button onClick={onClose} className="px-3 py-1 rounded-lg border">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 p-2 sm:p-6">
+      <div className="bg-white rounded-2xl w-full max-w-3xl shadow-xl">
+        {/* Header */}
+        <div className="flex items-center justify-between px-4 py-3 border-b">
+          <div>
+            <h3 className="text-base font-semibold">Configurar kit</h3>
+            <div className="text-xs text-slate-600">
+              {kitProduct?.sku} — {kitProduct?.name}
+            </div>
+          </div>
+          <button onClick={onClose} className="px-3 py-1.5 rounded-lg border hover:bg-slate-50">
             Cerrar
           </button>
         </div>
 
-        <div className="grid grid-cols-2 gap-3 mb-3">
+        {/* Controls */}
+        <div className="px-4 py-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
           <label className="flex flex-col">
-            <span className="text-xs text-gray-500">Cantidad del kit</span>
+            <span className="text-xs text-gray-500">Cantidad de kits</span>
             <input
               type="number"
               min={1}
               value={qtyKit}
-              onChange={(e) => setQtyKit(e.target.value)}
+              onChange={(e) => setQtyKit(toNum(e.target.value))}
               className="border rounded-xl px-3 py-2"
             />
           </label>
-          <div className="border rounded-xl p-3 bg-gray-50">
+          <div className="rounded-xl border bg-slate-50 px-3 py-2">
             <div className="text-xs text-gray-500">Total estimado</div>
             <div className="text-lg font-semibold">{currency(totalEst)}</div>
           </div>
         </div>
 
-        <div className="max-h-[55vh] overflow-auto border rounded-xl">
-          <table className="w-full text-sm">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="text-left p-2">Grupo / Componente</th>
-                <th className="text-left p-2">Elegir</th>
-                <th className="text-right p-2">Cant. x kit</th>
-                <th className="text-right p-2">Stock</th>
-                <th className="text-right p-2">Precio unit.</th>
-              </tr>
-            </thead>
-            <tbody>
-              {items.map((it) => {
-                const chosenId = choice[it.id];
-                const opts = [
-                  { id: it.component?.id, label: `${it.component?.sku} – ${it.component?.name} (base)`, ratio: 1 },
-                  ...it.subs.map((s) => ({
-                    id: s.product?.id,
-                    label: `${s.product?.sku} – ${s.product?.name} (sust.)`,
-                    ratio: toNum(s.qty_ratio) || 1,
-                  })),
-                ].filter((o) => !!o.id);
+        {/* Table */}
+        <div className="px-4 pb-4">
+          <div className="max-h-[55vh] overflow-auto rounded-xl border">
+            <table className="w-full text-sm">
+              <thead className="bg-slate-50 sticky top-0">
+                <tr>
+                  <th className="text-left p-2">Grupo / Componente</th>
+                  <th className="text-left p-2">Elegir</th>
+                  <th className="text-right p-2">Cant. x kit</th>
+                  <th className="text-right p-2">Stock</th>
+                  <th className="text-right p-2">Precio unit.</th>
+                </tr>
+              </thead>
+              <tbody>
+                {items.map((it) => {
+                  const chosenId = choice[it.id];
+                  const opts = [
+                    { id: it.component?.id, label: `${it.component?.sku} – ${it.component?.name} (base)`, ratio: 1 },
+                    ...it.subs.map((s) => ({
+                      id: s.product?.id,
+                      label: `${s.product?.sku} – ${s.product?.name} (sust.)`,
+                      ratio: toNum(s.qty_ratio) || 1,
+                    })),
+                  ].filter((o) => !!o.id);
 
-                const ratio = opts.find((o) => o.id === chosenId)?.ratio || 1;
-                const onHand = availableStock ? availableStock(chosenId) : 0;
+                  const ratio = opts.find((o) => o.id === chosenId)?.ratio || 1;
+                  const onHand = availableStock ? availableStock(chosenId) : 0;
 
-                return (
-                  <tr key={it.id} className="border-t">
-                    <td className="p-2 align-top">
-                      <div className="font-medium">{it.group_code || "—"}</div>
-                      <div className="text-xs text-gray-500">
-                        {it.component?.sku} – {it.component?.name} {it.required ? "" : "(opcional)"}
-                      </div>
-                    </td>
-                    <td className="p-2">
-                      <select
-                        value={chosenId ?? ""}
-                        onChange={(e) => setChoice((c) => ({ ...c, [it.id]: Number(e.target.value) }))}
-                        className="border rounded-lg px-2 py-1 w-full"
-                      >
-                        {opts.map((o) => (
-                          <option key={o.id} value={o.id}>
-                            {o.label}
-                          </option>
-                        ))}
-                      </select>
-                    </td>
-                    <td className="p-2 text-right">{toNum(it.qty) * ratio}</td>
-                    <td className="p-2 text-right">{onHand}</td>
-                    <td className="p-2 text-right">
-                      <input
-                        type="number"
-                        step="0.01"
-                        value={unitPrice[chosenId] ?? 0}
-                        onChange={(e) => setUnitPrice((u) => ({ ...u, [chosenId]: e.target.value }))}
-                        className="border rounded-lg px-2 py-1 w-28 text-right"
-                      />
+                  return (
+                    <tr key={it.id} className="border-t">
+                      <td className="p-2 align-top">
+                        <div className="font-medium">{it.group_code || "—"}</div>
+                        <div className="text-xs text-gray-500">
+                          {it.component?.sku} – {it.component?.name} {it.required ? "" : "(opcional)"}
+                        </div>
+                      </td>
+                      <td className="p-2">
+                        <select
+                          value={chosenId ?? ""}
+                          onChange={(e) => setChoice((c) => ({ ...c, [it.id]: Number(e.target.value) }))}
+                          className="border rounded-lg px-2 py-1 w-full"
+                        >
+                          {opts.map((o) => (
+                            <option key={o.id} value={o.id}>
+                              {o.label}
+                            </option>
+                          ))}
+                        </select>
+                      </td>
+                      <td className="p-2 text-right">{toNum(it.qty) * ratio}</td>
+                      <td className="p-2 text-right">{onHand}</td>
+                      <td className="p-2 text-right">
+                        <input
+                          type="number"
+                          step="0.01"
+                          value={unitPrice[chosenId] ?? 0}
+                          onChange={(e) => setUnitPrice((u) => ({ ...u, [chosenId]: toNum(e.target.value) }))}
+                          className="border rounded-lg px-2 py-1 w-28 text-right"
+                        />
+                      </td>
+                    </tr>
+                  );
+                })}
+                {items.length === 0 && (
+                  <tr>
+                    <td colSpan={5} className="p-4 text-center text-gray-500">
+                      {loading ? "Cargando..." : "Kit sin componentes configurados"}
                     </td>
                   </tr>
-                );
-              })}
-              {items.length === 0 && (
-                <tr>
-                  <td colSpan={5} className="p-4 text-center text-gray-500">
-                    {loading ? "Cargando..." : "Kit sin componentes configurados"}
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+                )}
+              </tbody>
+            </table>
+          </div>
 
-        <div className="flex justify-end gap-2 mt-3">
-          <button onClick={onClose} className="px-4 py-2 rounded-xl border">
-            Cancelar
-          </button>
-          <button
-            disabled={loading || items.length === 0}
-            onClick={() => {
-              const children = items.map((it) => {
-                const chosenId = choice[it.id];
-                const ratio =
-                  chosenId === it.component?.id
-                    ? 1
-                    : toNum(it.subs.find((s) => s.product?.id === chosenId)?.qty_ratio || 1);
-                return {
-                  kit_item_id: it.id,
-                  product_id: chosenId,
-                  qty_per_kit: toNum(it.qty) * ratio,
-                  unit_price: toNum(unitPrice[chosenId]),
-                  name_hint:
-                    (it.subs.find((s) => s.product?.id === chosenId)?.product?.sku &&
-                      `${it.subs.find((s) => s.product?.id === chosenId)?.product?.sku} – ${
-                        it.subs.find((s) => s.product?.id === chosenId)?.product?.name
-                      }`) ||
-                    `${it.component?.sku} – ${it.component?.name}`,
-                };
-              });
-              onConfirm({ qtyKit: toNum(qtyKit) || 1, children });
-            }}
-            className="px-4 py-2 rounded-xl bg-emerald-600 text-white disabled:opacity-60"
-          >
-            Confirmar
-          </button>
+          {/* Actions */}
+          <div className="flex justify-end gap-2 mt-3">
+            <button onClick={onClose} className="px-4 py-2 rounded-xl border hover:bg-slate-50">
+              Cancelar
+            </button>
+            <button
+              disabled={loading || items.length === 0}
+              onClick={() => {
+                const children = items.map((it) => {
+                  const chosenId = choice[it.id];
+                  const ratio =
+                    chosenId === it.component?.id
+                      ? 1
+                      : toNum(it.subs.find((s) => s.product?.id === chosenId)?.qty_ratio || 1);
+                  return {
+                    kit_item_id: it.id,
+                    product_id: chosenId,
+                    qty_per_kit: toNum(it.qty) * ratio,
+                    unit_price: toNum(unitPrice[chosenId]),
+                    name_hint:
+                      (it.subs.find((s) => s.product?.id === chosenId)?.product?.sku &&
+                        `${it.subs.find((s) => s.product?.id === chosenId)?.product?.sku} – ${
+                          it.subs.find((s) => s.product?.id === chosenId)?.product?.name
+                        }`) ||
+                      `${it.component?.sku} – ${it.component?.name}`,
+                  };
+                });
+                onConfirm({ qtyKit: toNum(qtyKit) || 1, children });
+              }}
+              className="px-4 py-2 rounded-xl bg-emerald-600 text-white disabled:opacity-60"
+            >
+              Confirmar
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -336,17 +343,15 @@ function KitConfigModal({ open, onClose, kitProduct, onConfirm, availableStock }
 }
 
 /* =========================================================
-   Componente principal: Ventas
+   Componente principal: Ventas (JSX)
 ========================================================= */
 export default function Sales({
   clients: externalClients,
   products = [],
   suppliers = [],
-  inventory, // puede venir vacío
+  inventory,
 }) {
-  /* =========================
-     RESUMEN DE VENTAS
-  ========================= */
+  /* ========================= RESUMEN ========================= */
   const [summaryFromDate, setSummaryFromDate] = useState(addDaysISO(-30));
   const [summaryToDate, setSummaryToDate] = useState(todayISO());
   const [summaryData, setSummaryData] = useState({ total: 0, byType: [] });
@@ -395,9 +400,7 @@ export default function Sales({
     loadSummary();
   }, [loadSummary]);
 
-  /* =========================
-     CLIENTE / CABECERA
-  ========================= */
+  /* ========================= CLIENTE / CABECERA ========================= */
   const [client, setClient] = useState(null);
   const [docType, setDocType] = useState("boleta");
   const [docNumber, setDocNumber] = useState("");
@@ -453,9 +456,7 @@ export default function Sales({
     [externalClients]
   );
 
-  /* =========================
-     STOCK (fallback local)
-  ========================= */
+  /* ========================= STOCK (fallback local) ========================= */
   const [stockMap, setStockMap] = useState({});
 
   const loadStockFallback = useCallback(async () => {
@@ -491,9 +492,7 @@ export default function Sales({
     [inventory?.stock, stockMap]
   );
 
-  /* =========================
-     ÍTEMS DEL CARRITO (soporta kit)
-  ========================= */
+  /* ========================= ÍTEMS (soporta kit) ========================= */
   // fila normal: { id, type:'normal', product, qty, unitPrice, discountPct }
   // fila kit:    { id, type:'kit', product, qtyKit, children:[{productId,name,qtyPerKit,unitPrice}] }
   const [items, setItems] = useState([]);
@@ -578,9 +577,7 @@ export default function Sales({
       })),
     };
 
-    setItems((prev) =>
-      prev.map((r) => (r.id === rowId ? kitRow : r))
-    );
+    setItems((prev) => prev.map((r) => (r.id === rowId ? kitRow : r)));
 
     // Enriquecer nombres de hijas si no llegaron
     (async () => {
@@ -624,9 +621,7 @@ export default function Sales({
     return { total };
   }, [items]);
 
-  /* =========================
-     HISTORIAL
-  ========================= */
+  /* ========================= HISTORIAL ========================= */
   const [history, setHistory] = useState([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [histQuery, setHistQuery] = useState("");
@@ -688,96 +683,89 @@ export default function Sales({
       });
   }, [history, histQuery, histOnlyPending]);
 
-  /* =========================
-     DETALLE (drawer)
-  ========================= */
+  /* ========================= DETALLE (drawer) ========================= */
   const [detailOpen, setDetailOpen] = useState(false);
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailHeader, setDetailHeader] = useState(null);
   const [detailItems, setDetailItems] = useState([]);
 
-  const openDetail = useCallback(
-    async (saleId) => {
-      setDetailOpen(true);
-      setDetailLoading(true);
-      setDetailHeader(null);
-      setDetailItems([]);
+  const openDetail = useCallback(async (saleId) => {
+    setDetailOpen(true);
+    setDetailLoading(true);
+    setDetailHeader(null);
+    setDetailItems([]);
 
-      // Cabecera
-      const { data: sale, error: sErr } = await supabase
-        .from("sales")
-        .select("id, date, due_date, total, payment_status, doc_type, doc_series_no, doc_number, client_id")
-        .eq("id", saleId)
-        .single();
+    // Cabecera
+    const { data: sale, error: sErr } = await supabase
+      .from("sales")
+      .select("id, date, due_date, total, payment_status, doc_type, doc_series_no, doc_number, client_id")
+      .eq("id", saleId)
+      .single();
 
-      if (sErr) {
-        setDetailLoading(false);
-        alert("No se pudo cargar el detalle: " + sErr.message);
-        return;
-      }
+    if (sErr) {
+      setDetailLoading(false);
+      alert("No se pudo cargar el detalle: " + sErr.message);
+      return;
+    }
 
-      // Cliente
-      let clientName = sale.client_id;
-      if (sale.client_id) {
-        const { data: c } = await supabase.from("clients").select("name").eq("id", sale.client_id).single();
-        clientName = c?.name || clientName;
-      }
+    // Cliente
+    let clientName = sale.client_id;
+    if (sale.client_id) {
+      const { data: c } = await supabase.from("clients").select("name").eq("id", sale.client_id).single();
+      clientName = c?.name || clientName;
+    }
 
-      setDetailHeader({
-        id: sale.id,
-        date: sale.date,
-        due_date: sale.due_date,
-        total: toNum(sale.total),
-        status: sale.payment_status || "—",
-        doc:
-          (sale.doc_type ? `${String(sale.doc_type).toUpperCase()} ` : "") +
-          (sale.doc_series_no || sale.doc_number || "—"),
-        clientName,
-      });
+    setDetailHeader({
+      id: sale.id,
+      date: sale.date,
+      due_date: sale.due_date,
+      total: toNum(sale.total),
+      status: sale.payment_status || "—",
+      doc:
+        (sale.doc_type ? `${String(sale.doc_type).toUpperCase()} ` : "") +
+        (sale.doc_series_no || sale.doc_number || "—"),
+      clientName,
+    });
 
-      // Ítems + productos (mostrará las hijas también si existen)
-      const { data: items, error: iErr } = await supabase
-        .from("sale_items")
-        .select(`
+    // Ítems
+    const { data: items, error: iErr } = await supabase
+      .from("sale_items")
+      .select(`
           id, qty, unit_price, discount_pct, parent_line_id,
           product:products(id, sku, name, unit)
         `)
-        .eq("sale_id", saleId)
-        .order("parent_line_id", { ascending: true });
+      .eq("sale_id", saleId)
+      .order("parent_line_id", { ascending: true });
 
-      if (iErr) {
-        setDetailLoading(false);
-        alert("No se pudieron cargar los ítems: " + iErr.message);
-        return;
-      }
-
-      setDetailItems(
-        (items || []).map((it) => {
-          const d = Math.min(Math.max(toNum(it.discount_pct), 0), 100);
-          const line = toNum(it.qty) * toNum(it.unit_price) * (1 - d / 100);
-          return {
-            id: it.id,
-            sku: it.product?.sku || "",
-            name: (it.product?.name || "") + (it.parent_line_id ? "" : " (KIT)"),
-            unit: it.product?.unit || "und",
-            qty: toNum(it.qty),
-            unit_price: toNum(it.unit_price),
-            discount_pct: toNum(it.discount_pct),
-            total: line,
-          };
-        })
-      );
-
+    if (iErr) {
       setDetailLoading(false);
-    },
-    []
-  );
+      alert("No se pudieron cargar los ítems: " + iErr.message);
+      return;
+    }
+
+    setDetailItems(
+      (items || []).map((it) => {
+        const d = Math.min(Math.max(toNum(it.discount_pct), 0), 100);
+        const line = toNum(it.qty) * toNum(it.unit_price) * (1 - d / 100);
+        return {
+          id: it.id,
+          sku: it.product?.sku || "",
+          name: (it.product?.name || "") + (it.parent_line_id ? "" : " (KIT)"),
+          unit: it.product?.unit || "und",
+          qty: toNum(it.qty),
+          unit_price: toNum(it.unit_price),
+          discount_pct: toNum(it.discount_pct),
+          total: line,
+        };
+      })
+    );
+
+    setDetailLoading(false);
+  }, []);
 
   const closeDetail = () => setDetailOpen(false);
 
-  /* =========================
-     CONFIRMAR VENTA (con soporte KIT)
-  ========================= */
+  /* ========================= CONFIRMAR VENTA ========================= */
   const confirm = async () => {
     if (!client) return alert("Selecciona un cliente.");
     if (items.length === 0) return alert("Agrega al menos un ítem.");
@@ -986,9 +974,7 @@ export default function Sales({
     }
   };
 
-  /* =========================
-     UI
-  ========================= */
+  /* ========================= UI ========================= */
   return (
     <>
       {/* MODAL KIT */}
@@ -1006,60 +992,59 @@ export default function Sales({
       {/* ========================= RESUMEN ========================= */}
       <Section title="Resumen de Ventas">
         <div className="grid md:grid-cols-3 gap-4">
-          {/* Filtros y Tarjeta */}
+          {/* Filtros + Totales */}
           <div className="md:col-span-1 space-y-3">
-            <div className="flex items-center gap-2">
-              <label className="flex flex-col grow">
-                <span className="text-xs text-gray-500">Desde</span>
-                <input
-                  type="date"
-                  value={summaryFromDate}
-                  onChange={(e) => setSummaryFromDate(e.target.value)}
-                  className="border rounded-xl px-3 py-2"
-                />
-              </label>
-              <label className="flex flex-col grow">
-                <span className="text-xs text-gray-500">Hasta</span>
-                <input
-                  type="date"
-                  value={summaryToDate}
-                  onChange={(e) => setSummaryToDate(e.target.value)}
-                  className="border rounded-xl px-3 py-2"
-                />
-              </label>
-            </div>
-            <button
-              onClick={loadSummary}
-              className="w-full px-3 py-2 rounded-xl border"
-              disabled={loadingSummary}
-            >
-              {loadingSummary ? "Cargando..." : "Recargar"}
-            </button>
+            <div className="rounded-2xl border bg-white p-3 shadow-sm">
+              <div className="grid grid-cols-2 gap-2">
+                <label className="flex flex-col">
+                  <span className="text-xs text-gray-500">Desde</span>
+                  <input
+                    type="date"
+                    value={summaryFromDate}
+                    onChange={(e) => setSummaryFromDate(e.target.value)}
+                    className="border rounded-xl px-3 py-2"
+                  />
+                </label>
+                <label className="flex flex-col">
+                  <span className="text-xs text-gray-500">Hasta</span>
+                  <input
+                    type="date"
+                    value={summaryToDate}
+                    onChange={(e) => setSummaryToDate(e.target.value)}
+                    className="border rounded-xl px-3 py-2"
+                  />
+                </label>
+              </div>
+              <button
+                onClick={loadSummary}
+                className="mt-3 w-full px-3 py-2 rounded-xl border hover:bg-slate-50"
+                disabled={loadingSummary}
+              >
+                {loadingSummary ? "Cargando..." : "Recargar"}
+              </button>
 
-            <div className="bg-gray-900 text-white p-4 rounded-xl">
-              <div className="text-sm text-gray-300">Total vendido en el rango</div>
-              <div className="text-3xl font-bold mt-1">
-                {loadingSummary ? "..." : currency(summaryData.total)}
+              <div className="mt-3 rounded-xl bg-slate-900 text-white p-4">
+                <div className="text-sm text-slate-300">Total vendido en el rango</div>
+                <div className="text-3xl font-bold mt-1">
+                  {loadingSummary ? "..." : currency(summaryData.total)}
+                </div>
               </div>
             </div>
           </div>
 
           {/* Gráfico */}
-          <div className="md:col-span-2 bg-gray-50 p-4 rounded-xl min-h-[250px] flex items-center justify-center">
+          <div className="md:col-span-2 rounded-2xl border bg-white p-4 shadow-sm min-h-[250px]">
             {loadingSummary ? (
-              "Cargando gráfico..."
+              <div className="h-[250px] grid place-content-center text-slate-500">Cargando gráfico…</div>
             ) : (
               <ResponsiveContainer width="100%" height={250}>
-                <BarChart
-                  data={summaryData.byType}
-                  margin={{ top: 5, right: 20, left: -10, bottom: 5 }}
-                >
+                <BarChart data={summaryData.byType} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="name" />
                   <YAxis />
                   <Tooltip content={<CustomTooltip />} cursor={{ fill: "rgba(230,230,230,0.5)" }} />
                   <Legend />
-                  <Bar dataKey="cantidad" fill="#1f2937" name="Cantidad" />
+                  <Bar dataKey="cantidad" fill="#0ea5e9" name="Cantidad" />
                 </BarChart>
               </ResponsiveContainer>
             )}
@@ -1070,333 +1055,350 @@ export default function Sales({
       {/* ========================= REGISTRO ========================= */}
       <Section title="Ventas (precio y descuento editables)">
         {/* CABECERA */}
-        <div className="grid md:grid-cols-4 gap-3 mb-4 items-end">
-          <div className="md:col-span-2">
-            <span className="text-xs text-gray-500 block mb-1">Cliente</span>
-            <AsyncCombobox
-              value={client}
-              onChange={setClient}
-              fetcher={fetchClients}
-              displayValue={(c) => c?.name || ""}
-              placeholder="Busca cliente por nombre, DNI o RUC"
-              renderOption={(c) => (
-                <div className="flex items-center justify-between gap-3">
-                  <div className="min-w-0">
-                    <div className="font-medium truncate">{c.name}</div>
-                    <div className="text-xs text-gray-500 truncate">
-                      {docIdOf(c) || "—"} · {c.telefono || "s/teléfono"} · {c.tipo || "normal"}
+        <div className="rounded-2xl border bg-white p-4 shadow-sm mb-4">
+          <div className="grid md:grid-cols-4 gap-3">
+            <div className="md:col-span-2">
+              <span className="text-xs text-gray-500 block mb-1">Cliente</span>
+              <AsyncCombobox
+                value={client}
+                onChange={setClient}
+                fetcher={fetchClients}
+                displayValue={(c) => c?.name || ""}
+                placeholder="Busca cliente por nombre, DNI o RUC"
+                renderOption={(c) => (
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="font-medium truncate">{c.name}</div>
+                      <div className="text-xs text-gray-500 truncate">
+                        {docIdOf(c) || "—"} · {c.telefono || "s/teléfono"} · {c.tipo || "normal"}
+                      </div>
                     </div>
                   </div>
-                </div>
-              )}
-            />
-          </div>
+                )}
+              />
+            </div>
 
-          <label className="flex flex-col">
-            <span className="text-xs text-gray-500">Comprobante</span>
-            <select
-              value={docType}
-              onChange={(e) => {
-                const v = e.target.value;
-                const hasRuc = isRUC(client?.ruc);
-                if (v === "factura" && !hasRuc) {
-                  alert("Para FACTURA el cliente debe tener RUC. Se mantendrá en Boleta.");
-                  return;
-                }
-                setDocType(v);
-              }}
-              className="border rounded-xl px-3 py-2"
-            >
-              <option value="boleta">Boleta</option>
-              <option value="factura" disabled={!isRUC(client?.ruc)}>
-                Factura {isRUC(client?.ruc) ? "" : "(requiere RUC)"}
-              </option>
-            </select>
-          </label>
-
-          <label className="flex flex-col">
-            <span className="text-xs text-gray-500">Serie / Nº (opcional)</span>
-            <input
-              value={docNumber}
-              onChange={(e) => setDocNumber(e.target.value)}
-              placeholder="Ejm: F001-000123"
-              className="border rounded-xl px-3 py-2"
-            />
-          </label>
-        </div>
-
-        {/* Campos de crédito para distribuidor */}
-        {isDistrib && (
-          <div className="grid md:grid-cols-4 gap-3 mb-2">
             <label className="flex flex-col">
-              <span className="text-xs text-gray-500">F. emisión</span>
-              <input
-                type="date"
+              <span className="text-xs text-gray-500">Comprobante</span>
+              <select
+                value={docType}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  const hasRuc = isRUC(client?.ruc);
+                  if (v === "factura" && !hasRuc) {
+                    alert("Para FACTURA el cliente debe tener RUC. Se mantendrá en Boleta.");
+                    return;
+                  }
+                  setDocType(v);
+                }}
                 className="border rounded-xl px-3 py-2"
-                value={issueDate}
-                onChange={(e) => setIssueDate(e.target.value)}
+              >
+                <option value="boleta">Boleta</option>
+                <option value="factura" disabled={!isRUC(client?.ruc)}>
+                  Factura {isRUC(client?.ruc) ? "" : "(requiere RUC)"}
+                </option>
+              </select>
+            </label>
+
+            <label className="flex flex-col">
+              <span className="text-xs text-gray-500">Serie / Nº (opcional)</span>
+              <input
+                value={docNumber}
+                onChange={(e) => setDocNumber(e.target.value)}
+                placeholder="Ejm: F001-000123"
+                className="border rounded-xl px-3 py-2"
               />
             </label>
-            <label className="flex flex-col">
-              <span className="text-xs text-gray-500">F. vencimiento</span>
-              <input
-                type="date"
-                className="border rounded-xl px-3 py-2"
-                value={dueDate}
-                onChange={(e) => setDueDate(e.target.value)}
-              />
-            </label>
-            <label className="flex items-center gap-2 mt-6">
-              <input type="checkbox" checked={paidNow} onChange={(e) => setPaidNow(e.target.checked)} />
-              <span className="text-sm">Pago recibido ahora</span>
-            </label>
-            <div className="text-xs text-gray-500 mt-6">
-              Si NO marcas “Pago recibido ahora”, la venta queda <b>pendiente</b> y no descarga stock.
-            </div>
           </div>
-        )}
 
-        <div className="flex items-end mb-4">
-          <button
-            onClick={addItem}
-            className="px-3 py-2 rounded-xl bg-gray-900 text-white w-full md:w-auto disabled:opacity-60"
-            disabled={!client}
-          >
-            Agregar ítem
-          </button>
-        </div>
-
-        {/* ÍTEMS (soporta kits) */}
-        <Table
-          columns={[
-            {
-              key: "product",
-              label: "Producto",
-              render: (r) => (
-                r.type === "normal" ? (
-                  <AsyncCombobox
-                    value={r.product}
-                    onChange={(p) => handleSelectProduct(r, p)}
-                    fetcher={fetchProducts}
-                    displayValue={(p) => (p ? `${p.sku} – ${p.name}${p.is_kit ? " (KIT)" : ""}` : "")}
-                    placeholder="Busca producto por nombre o SKU"
-                    renderOption={(p) => {
-                      const onHand = availableStock(p.id);
-                      return (
-                        <div className="flex items-center justify-between gap-3">
-                          <div className="min-w-0">
-                            <div className="truncate">
-                              {p.sku} – {p.name} {p.is_kit ? <span className="text-[10px] px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700 ml-1">KIT</span> : null}
-                            </div>
-                            <div className="text-xs text-gray-500 truncate">
-                              Prov. {supplierNameOf(p)} · {p.unit || "und"} · Stock: {onHand}
-                            </div>
-                          </div>
-                          <div className="text-sm font-medium shrink-0">{currency(basePriceOf(p))}</div>
-                        </div>
-                      );
-                    }}
-                  />
-                ) : (
-                  <div className="flex items-center gap-2">
-                    <div className="font-medium truncate">
-                      {r.product?.sku} – {r.product?.name}
-                    </div>
-                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700">
-                      KIT
-                    </span>
-                  </div>
-                )
-              ),
-            },
-            {
-              key: "qty",
-              label: "Cant.",
-              render: (r) =>
-                r.type === "normal" ? (
-                  <input
-                    type="number"
-                    min={1}
-                    value={r.qty}
-                    onChange={(e) =>
-                      setItems((prev) =>
-                        prev.map((x) => (x.id === r.id ? { ...x, qty: toNum(e.target.value) } : x))
-                      )
-                    }
-                    className="border rounded-lg px-2 py-1 w-24"
-                  />
-                ) : (
-                  <input
-                    type="number"
-                    min={1}
-                    value={r.qtyKit}
-                    onChange={(e) =>
-                      setItems((prev) =>
-                        prev.map((x) => (x.id === r.id ? { ...x, qtyKit: toNum(e.target.value) } : x))
-                      )
-                    }
-                    className="border rounded-lg px-2 py-1 w-24"
-                  />
-                ),
-            },
-            {
-              key: "unitPrice",
-              label: "Precio Unit.",
-              render: (r) =>
-                r.type === "normal" ? (
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={r.unitPrice}
-                    onChange={(e) =>
-                      setItems((prev) =>
-                        prev.map((x) =>
-                          x.id === r.id ? { ...x, unitPrice: toNum(e.target.value) } : x
-                        )
-                      )
-                    }
-                    className="border rounded-lg px-2 py-1 w-28"
-                  />
-                ) : (
-                  <span className="text-gray-500">—</span>
-                ),
-            },
-            {
-              key: "discountPct",
-              label: "% Desc.",
-              render: (r) =>
-                r.type === "normal" ? (
-                  <input
-                    type="number"
-                    min={0}
-                    max={100}
-                    value={r.discountPct}
-                    onChange={(e) =>
-                      setItems((prev) =>
-                        prev.map((x) =>
-                          x.id === r.id ? { ...x, discountPct: toNum(e.target.value) } : x
-                        )
-                      )
-                    }
-                    className="border rounded-lg px-2 py-1 w-20"
-                  />
-                ) : (
-                  <span className="text-gray-500">—</span>
-                ),
-            },
-            {
-              key: "line",
-              label: "Importe",
-              render: (r) => {
-                if (r.type === "normal") {
-                  const d = Math.min(Math.max(toNum(r.discountPct), 0), 100);
-                  const line = toNum(r.qty) * toNum(r.unitPrice) * (1 - d / 100);
-                  return currency(line);
-                }
-                const totalKit = r.children.reduce(
-                  (acc, ch) => acc + toNum(ch.qtyPerKit) * toNum(r.qtyKit) * toNum(ch.unitPrice),
-                  0
-                );
-                return currency(totalKit);
-              },
-            },
-            {
-              key: "rm",
-              label: "",
-              render: (r) => (
-                <button onClick={() => removeItem(r.id)} className="px-2 py-1 rounded-lg border text-red-600">
-                  Quitar
-                </button>
-              ),
-            },
-          ]}
-          rows={items}
-          keyField="id"
-          emptyMessage="Sin ítems"
-        />
-
-        {/* Subfilas con componentes del kit */}
-        {items.some((i) => i.type === "kit") && (
-          <div className="mt-2 text-xs text-gray-600">
-            <div className="border rounded-xl overflow-hidden">
-              <table className="w-full text-sm">
-                <thead className="bg-indigo-50">
-                  <tr>
-                    <th className="text-left p-2">Detalle de kits</th>
-                    <th className="text-right p-2">Cant.</th>
-                    <th className="text-right p-2">P. Unit.</th>
-                    <th className="text-right p-2">Importe</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {items
-                    .filter((i) => i.type === "kit")
-                    .map((k) =>
-                      k.children.map((ch, idx) => (
-                        <tr key={`${k.id}-${idx}`} className="border-t">
-                          <td className="p-2 pl-8">
-                            <span className="text-gray-500">↳</span> {ch.name || ch.productId}
-                          </td>
-                          <td className="p-2 text-right">{toNum(ch.qtyPerKit) * toNum(k.qtyKit)}</td>
-                          <td className="p-2 text-right">
-                            <input
-                              type="number"
-                              step="0.01"
-                              value={ch.unitPrice}
-                              onChange={(e) =>
-                                setItems((prev) =>
-                                  prev.map((row) =>
-                                    row.id === k.id
-                                      ? {
-                                          ...row,
-                                          children: row.children.map((c, i) =>
-                                            i === idx ? { ...c, unitPrice: toNum(e.target.value) } : c
-                                          ),
-                                        }
-                                      : row
-                                  )
-                                )
-                              }
-                              className="border rounded-lg px-2 py-1 w-28 text-right"
-                            />
-                          </td>
-                          <td className="p-2 text-right">
-                            {currency(toNum(ch.qtyPerKit) * toNum(k.qtyKit) * toNum(ch.unitPrice))}
-                          </td>
-                        </tr>
-                      ))
-                    )}
-                </tbody>
-              </table>
+          {/* Campos de crédito para distribuidor */}
+          {isDistrib && (
+            <div className="grid md:grid-cols-4 gap-3 mt-3">
+              <label className="flex flex-col">
+                <span className="text-xs text-gray-500">F. emisión</span>
+                <input
+                  type="date"
+                  className="border rounded-xl px-3 py-2"
+                  value={issueDate}
+                  onChange={(e) => setIssueDate(e.target.value)}
+                />
+              </label>
+              <label className="flex flex-col">
+                <span className="text-xs text-gray-500">F. vencimiento</span>
+                <input
+                  type="date"
+                  className="border rounded-xl px-3 py-2"
+                  value={dueDate}
+                  onChange={(e) => setDueDate(e.target.value)}
+                />
+              </label>
+              <label className="flex items-center gap-2 mt-6">
+                <input type="checkbox" checked={paidNow} onChange={(e) => setPaidNow(e.target.checked)} />
+                <span className="text-sm">Pago recibido ahora</span>
+              </label>
+              <div className="text-xs text-gray-500 mt-6">
+                Si NO marcas “Pago recibido ahora”, la venta queda <b>pendiente</b> y no descarga stock.
+              </div>
             </div>
-          </div>
-        )}
+          )}
 
-        {/* TOTALES */}
-        <div className="flex justify-end mt-4 text-sm">
-          <div className="bg-gray-50 rounded-xl p-4 w-full md:w-96">
-            <div className="flex justify-between">
-              <span>Comprobante</span>
-              <strong className="uppercase">
-                {docType} {docNumber ? `· ${docNumber}` : ""}
-              </strong>
-            </div>
-            <div className="flex justify-between text-lg mt-1">
-              <span>Total (IGV incluido)</span>
-              <strong>{currency(totals.total)}</strong>
-            </div>
+          <div className="mt-3">
             <button
-              onClick={confirm}
-              className="mt-3 w-full px-4 py-2 rounded-xl bg-emerald-600 text-white disabled:opacity-60"
-              disabled={!client || items.length === 0}
+              onClick={addItem}
+              className="px-3 py-2 rounded-xl bg-gray-900 text-white w-full md:w-auto disabled:opacity-60"
+              disabled={!client}
             >
-              Confirmar venta
+              Agregar ítem
             </button>
           </div>
         </div>
 
+        {/* Grid principal: tabla + totales sticky */}
+        <div className="grid lg:grid-cols-[1fr_380px] gap-4">
+          {/* ÍTEMS (soporta kits) */}
+          <div className="rounded-2xl border bg-white shadow-sm overflow-hidden">
+            <div className="max-h-[56vh] overflow-auto">
+              <Table
+                columns={[
+                  {
+                    key: "product",
+                    label: "Producto",
+                    render: (r) =>
+                      r.type === "normal" ? (
+                        <AsyncCombobox
+                          value={r.product}
+                          onChange={(p) => handleSelectProduct(r, p)}
+                          fetcher={fetchProducts}
+                          displayValue={(p) => (p ? `${p.sku} – ${p.name}${p.is_kit ? " (KIT)" : ""}` : "")}
+                          placeholder="Busca producto por nombre o SKU"
+                          renderOption={(p) => {
+                            const onHand = availableStock(p.id);
+                            return (
+                              <div className="flex items-center justify-between gap-3">
+                                <div className="min-w-0">
+                                  <div className="truncate">
+                                    {p.sku} – {p.name}{" "}
+                                    {p.is_kit ? (
+                                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700 ml-1">
+                                        KIT
+                                      </span>
+                                    ) : null}
+                                  </div>
+                                  <div className="text-xs text-gray-500 truncate">
+                                    Prov. {supplierNameOf(p)} · {p.unit || "und"} · Stock: {onHand}
+                                  </div>
+                                </div>
+                                <div className="text-sm font-medium shrink-0">{currency(basePriceOf(p))}</div>
+                              </div>
+                            );
+                          }}
+                        />
+                      ) : (
+                        <div className="flex items-center gap-2">
+                          <div className="font-medium truncate">
+                            {r.product?.sku} – {r.product?.name}
+                          </div>
+                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700">
+                            KIT
+                          </span>
+                        </div>
+                      ),
+                  },
+                  {
+                    key: "qty",
+                    label: "Cant.",
+                    render: (r) =>
+                      r.type === "normal" ? (
+                        <input
+                          type="number"
+                          min={1}
+                          value={r.qty}
+                          onChange={(e) =>
+                            setItems((prev) =>
+                              prev.map((x) => (x.id === r.id ? { ...x, qty: toNum(e.target.value) } : x))
+                            )
+                          }
+                          className="border rounded-lg px-2 py-1 w-24"
+                        />
+                      ) : (
+                        <input
+                          type="number"
+                          min={1}
+                          value={r.qtyKit}
+                          onChange={(e) =>
+                            setItems((prev) =>
+                              prev.map((x) => (x.id === r.id ? { ...x, qtyKit: toNum(e.target.value) } : x))
+                            )
+                          }
+                          className="border rounded-lg px-2 py-1 w-24"
+                        />
+                      ),
+                  },
+                  {
+                    key: "unitPrice",
+                    label: "Precio Unit.",
+                    render: (r) =>
+                      r.type === "normal" ? (
+                        <input
+                          type="number"
+                          step="0.01"
+                          value={r.unitPrice}
+                          onChange={(e) =>
+                            setItems((prev) =>
+                              prev.map((x) => (x.id === r.id ? { ...x, unitPrice: toNum(e.target.value) } : x))
+                            )
+                          }
+                          className="border rounded-lg px-2 py-1 w-28"
+                        />
+                      ) : (
+                        <span className="text-gray-500">—</span>
+                      ),
+                  },
+                  {
+                    key: "discountPct",
+                    label: "% Desc.",
+                    render: (r) =>
+                      r.type === "normal" ? (
+                        <input
+                          type="number"
+                          min={0}
+                          max={100}
+                          value={r.discountPct}
+                          onChange={(e) =>
+                            setItems((prev) =>
+                              prev.map((x) =>
+                                x.id === r.id ? { ...x, discountPct: toNum(e.target.value) } : x
+                              )
+                            )
+                          }
+                          className="border rounded-lg px-2 py-1 w-20"
+                        />
+                      ) : (
+                        <span className="text-gray-500">—</span>
+                      ),
+                  },
+                  {
+                    key: "line",
+                    label: "Importe",
+                    render: (r) => {
+                      if (r.type === "normal") {
+                        const d = Math.min(Math.max(toNum(r.discountPct), 0), 100);
+                        const line = toNum(r.qty) * toNum(r.unitPrice) * (1 - d / 100);
+                        return currency(line);
+                      }
+                      const totalKit = r.children.reduce(
+                        (acc, ch) => acc + toNum(ch.qtyPerKit) * toNum(r.qtyKit) * toNum(ch.unitPrice),
+                        0
+                      );
+                      return currency(totalKit);
+                    },
+                  },
+                  {
+                    key: "rm",
+                    label: "",
+                    render: (r) => (
+                      <button onClick={() => removeItem(r.id)} className="px-2 py-1 rounded-lg border text-red-600">
+                        Quitar
+                      </button>
+                    ),
+                  },
+                ]}
+                rows={items}
+                keyField="id"
+                emptyMessage="Sin ítems"
+              />
+            </div>
+
+            {/* Subfilas con componentes del kit */}
+            {items.some((i) => i.type === "kit") && (
+              <div className="border-t">
+                <div className="bg-indigo-50/60 px-3 py-2 text-xs font-medium text-indigo-800">
+                  Detalle de kits
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead className="bg-indigo-50">
+                      <tr>
+                        <th className="text-left p-2">Componente</th>
+                        <th className="text-right p-2">Cant.</th>
+                        <th className="text-right p-2">P. Unit.</th>
+                        <th className="text-right p-2">Importe</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {items
+                        .filter((i) => i.type === "kit")
+                        .map((k) =>
+                          k.children.map((ch, idx) => (
+                            <tr key={`${k.id}-${idx}`} className="border-t">
+                              <td className="p-2 pl-8">
+                                <span className="text-gray-500">↳</span> {ch.name || ch.productId}
+                              </td>
+                              <td className="p-2 text-right">{toNum(ch.qtyPerKit) * toNum(k.qtyKit)}</td>
+                              <td className="p-2 text-right">
+                                <input
+                                  type="number"
+                                  step="0.01"
+                                  value={ch.unitPrice}
+                                  onChange={(e) =>
+                                    setItems((prev) =>
+                                      prev.map((row) =>
+                                        row.id === k.id
+                                          ? {
+                                              ...row,
+                                              children: row.children.map((c, i) =>
+                                                i === idx ? { ...c, unitPrice: toNum(e.target.value) } : c
+                                              ),
+                                            }
+                                          : row
+                                      )
+                                    )
+                                  }
+                                  className="border rounded-lg px-2 py-1 w-28 text-right"
+                                />
+                              </td>
+                              <td className="p-2 text-right">
+                                {currency(toNum(ch.qtyPerKit) * toNum(k.qtyKit) * toNum(ch.unitPrice))}
+                              </td>
+                            </tr>
+                          ))
+                        )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* TOTALES (sticky) */}
+          <aside className="lg:sticky lg:top-24 h-fit">
+            <div className="bg-white rounded-2xl border shadow-sm p-4">
+              <div className="flex justify-between">
+                <span>Comprobante</span>
+                <strong className="uppercase">
+                  {docType} {docNumber ? `· ${docNumber}` : ""}
+                </strong>
+              </div>
+              <div className="flex justify-between text-lg mt-1">
+                <span>Total (IGV incluido)</span>
+                <strong>{currency(totals.total)}</strong>
+              </div>
+              <button
+                onClick={confirm}
+                className="mt-3 w-full px-4 py-2 rounded-xl bg-emerald-600 text-white disabled:opacity-60"
+                disabled={!client || items.length === 0}
+              >
+                Confirmar venta
+              </button>
+              <div className="mt-2 text-[11px] text-slate-500">
+                Guarda y descuenta stock según la condición de pago configurada.
+              </div>
+            </div>
+          </aside>
+        </div>
+
         {/* ========================= HISTORIAL ========================= */}
-        <div className="mt-8">
+        <div className="mt-8 rounded-2xl border bg-white shadow-sm p-4">
           <div className="flex items-end justify-between mb-2 gap-3 flex-wrap">
             <h3 className="font-medium">Historial de ventas (últimas 50)</h3>
             <div className="flex items-center gap-2">
@@ -1414,7 +1416,7 @@ export default function Sales({
                 />
                 Solo pendientes
               </label>
-              <button onClick={loadHistory} className="px-3 py-2 rounded-xl border">
+              <button onClick={loadHistory} className="px-3 py-2 rounded-xl border hover:bg-slate-50">
                 {loadingHistory ? "Cargando…" : "Recargar"}
               </button>
             </div>
@@ -1433,7 +1435,9 @@ export default function Sales({
                 render: (r) => (
                   <span
                     className={`px-2 py-1 rounded-lg text-xs ${
-                      r.status === "pendiente" ? "bg-yellow-100 text-yellow-800" : "bg-emerald-100 text-emerald-800"
+                      r.status === "pendiente"
+                        ? "bg-yellow-100 text-yellow-800"
+                        : "bg-emerald-100 text-emerald-800"
                     }`}
                   >
                     {r.status}
@@ -1467,10 +1471,10 @@ export default function Sales({
           {/* overlay */}
           <div className="absolute inset-0 bg-black/40" onClick={closeDetail} />
           {/* panel */}
-          <div className="absolute right-0 top-0 h-full w-full sm:w-[540px] bg-white shadow-2xl flex flex-col">
+          <div className="absolute right-0 top-0 h-full w-full sm:w-[560px] bg-white shadow-2xl flex flex-col">
             <div className="p-4 border-b flex items-center justify-between">
               <h3 className="font-semibold">Detalle de venta</h3>
-              <button onClick={closeDetail} className="text-sm px-3 py-1 border rounded-lg">
+              <button onClick={closeDetail} className="text-sm px-3 py-1 border rounded-lg hover:bg-slate-50">
                 Cerrar
               </button>
             </div>
@@ -1525,11 +1529,7 @@ export default function Sales({
                       { key: "unit", label: "Und." },
                       { key: "qty", label: "Cant." },
                       { key: "unit_price", label: "P. Unit.", render: (r) => currency(r.unit_price) },
-                      {
-                        key: "discount_pct",
-                        label: "% Desc.",
-                        render: (r) => `${toNum(r.discount_pct)}%`,
-                      },
+                      { key: "discount_pct", label: "% Desc.", render: (r) => `${toNum(r.discount_pct)}%` },
                       { key: "total", label: "Importe", render: (r) => currency(r.total) },
                     ]}
                     rows={detailItems}

@@ -7,9 +7,11 @@ import usePerms from "../app/hooks/usePerms";
 // Ajusta estos tipos si tu hook usa otros nombres
 type Role = "manager" | "secretary";
 type ModuleKey =
+  | "summary"     // 👈 NUEVO: Resumen general
   | "sales"
   | "receivables"
   | "purchases"
+  | "expenses"
   | "inventory"
   | "services"
   | "maintenance"
@@ -27,9 +29,11 @@ type Ruta = {
 };
 
 const RUTAS: Ruta[] = [
+  { label: "Resumen general",      path: "/summary",     perm: "summary" },   // 👈 NUEVA ruta
   { label: "Ventas",               path: "/sales",        perm: "sales" },
   { label: "Cobros",               path: "/receivables",  perm: "receivables" },
   { label: "Compras",              path: "/purchases",    perm: "purchases" },
+  { label: "Gastos",               path: "/expenses",     perm: "expenses" },
   { label: "Inventario",           path: "/inventory",    perm: "inventory" },
   { label: "Servicios",            path: "/services",     perm: "services" },
   { label: "Mantenimiento",        path: "/maintenance",  perm: "maintenance" },
@@ -44,7 +48,6 @@ export default function BreadcrumbsRG() {
   const location = useLocation();
   const navigate = useNavigate();
 
-  // Tu hook expone 'can' (no 'hasPerm')
   const { role, can } = usePerms() as {
     role: Role;
     can: (moduleKey: ModuleKey) => boolean;
@@ -77,7 +80,7 @@ export default function BreadcrumbsRG() {
   const irA = (path: string) => navigate(path);
 
   return (
-    <div className="w-full px-4">
+    <div className="w-full px-4 pt-4 md:pt-6">
       <div className="mx-auto max-w-7xl">
         <div className="rounded-2xl border border-slate-200 bg-white shadow-sm p-4 md:p-5">
           {/* ------ Breadcrumb superior ------ */}
