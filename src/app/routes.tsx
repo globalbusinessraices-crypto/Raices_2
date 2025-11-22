@@ -8,7 +8,7 @@ import ModulesShell from "../components/ModulesShell";
 import Home from "../modules/home/Home";
 import Login from "../modules/auth/Login";
 import Expenses from "../modules/expenses/Expenses";
-import ResumenGeneral from "../modules/summary/ResumenGeneral"; // 👈 NUEVO
+import ResumenGeneral from "../modules/summary/ResumenGeneral";
 
 import Sales from "../modules/sales/Sales";
 import Receivables from "../modules/receivables/Receivables";
@@ -34,20 +34,19 @@ const SuppliersPage    = () => <Suppliers    {...({} as any)} />;
 const ProductsPage     = () => <Products     {...({} as any)} />;
 const RewardsPage      = () => <Rewards      {...({} as any)} />;
 const ExpensesPage     = () => <Expenses     {...({} as any)} />;
-const SummaryPage      = () => <ResumenGeneral {...({} as any)} />; // 👈 NUEVO
+const SummaryPage      = () => <ResumenGeneral {...({} as any)} />;
 const UsersAccessPage  = () => <UsersAccess />;
 
 export default function AppRoutes() {
   return (
     <Routes>
-      {/* Raíz -> Home */}
-     <Route path="/" element={<Navigate to="/login" replace />} />
-
+      {/* 🚀 Raíz debe ir a LOGIN, no a Home */}
+      <Route path="/" element={<Navigate to="/login" replace />} />
 
       {/* Público */}
       <Route path="/login" element={<Login />} />
 
-      {/* Home (sin breadcrumb) */}
+      {/* Home (protegido) */}
       <Route
         path="/home"
         element={
@@ -57,9 +56,8 @@ export default function AppRoutes() {
         }
       />
 
-      {/* ===== Todas las rutas de módulos envueltas por el shell con Breadcrumbs ===== */}
+      {/* ===== Módulos con el shell principal ===== */}
       <Route element={<ModulesShell />}>
-        {/* Resumen general */}
         <Route
           path="/summary"
           element={
@@ -68,7 +66,6 @@ export default function AppRoutes() {
             </ProtectedRoute>
           }
         />
-
         <Route
           path="/sales"
           element={
@@ -179,8 +176,7 @@ export default function AppRoutes() {
       <Route path="/productos"     element={<Navigate to="/products" replace />} />
       <Route path="/premios"       element={<Navigate to="/rewards" replace />} />
       <Route path="/usuarios"      element={<Navigate to="/users" replace />} />
-      {/* Alias para resumen */}
-      <Route path="/resumen"       element={<Navigate to="/summary" replace />} /> {/* opcional */}
+      <Route path="/resumen"       element={<Navigate to="/summary" replace />} />
 
       {/* 404 */}
       <Route path="*" element={<div className="p-6">Página no encontrada</div>} />
