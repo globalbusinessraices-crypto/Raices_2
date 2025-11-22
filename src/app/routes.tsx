@@ -41,7 +41,8 @@ export default function AppRoutes() {
   return (
     <Routes>
       {/* Raíz -> Home */}
-      <Route path="/" element={<Navigate to="/home" replace />} />
+     <Route path="/" element={<Navigate to="/login" replace />} />
+
 
       {/* Público */}
       <Route path="/login" element={<Login />} />
