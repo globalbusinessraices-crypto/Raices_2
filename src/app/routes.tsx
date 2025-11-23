@@ -22,6 +22,9 @@ import Products from "../modules/products/Products";
 import Rewards from "../modules/rewards/Premios";
 import UsersAccess from "../modules/config/UsersAccess";
 
+// ⚡️ NUEVO MÓDULO
+import IndustrialServices from "../modules/industrial_services/IndustrialServices";
+
 /** Wrappers de compatibilidad (props mínimos) */
 const SalesPage        = () => <Sales        {...({} as any)} />;
 const ReceivablesPage  = () => <Receivables  {...({} as any)} />;
@@ -37,16 +40,19 @@ const ExpensesPage     = () => <Expenses     {...({} as any)} />;
 const SummaryPage      = () => <ResumenGeneral {...({} as any)} />;
 const UsersAccessPage  = () => <UsersAccess />;
 
+// ⚡️ WRAPPER NUEVO
+const IndustrialServicesPage = () => <IndustrialServices {...({} as any)} />;
+
 export default function AppRoutes() {
   return (
     <Routes>
-      {/* 🚀 Raíz debe ir a LOGIN, no a Home */}
+      {/* 🚀 Root → login */}
       <Route path="/" element={<Navigate to="/login" replace />} />
 
       {/* Público */}
       <Route path="/login" element={<Login />} />
 
-      {/* Home (protegido) */}
+      {/* Home protegido */}
       <Route
         path="/home"
         element={
@@ -56,8 +62,9 @@ export default function AppRoutes() {
         }
       />
 
-      {/* ===== Módulos con el shell principal ===== */}
+      {/* ===== Módulos envueltos en ModulesShell ===== */}
       <Route element={<ModulesShell />}>
+
         <Route
           path="/summary"
           element={
@@ -66,6 +73,7 @@ export default function AppRoutes() {
             </ProtectedRoute>
           }
         />
+
         <Route
           path="/sales"
           element={
@@ -74,6 +82,7 @@ export default function AppRoutes() {
             </ProtectedRoute>
           }
         />
+
         <Route
           path="/receivables"
           element={
@@ -82,6 +91,7 @@ export default function AppRoutes() {
             </ProtectedRoute>
           }
         />
+
         <Route
           path="/purchases"
           element={
@@ -90,6 +100,7 @@ export default function AppRoutes() {
             </ProtectedRoute>
           }
         />
+
         <Route
           path="/inventory"
           element={
@@ -98,6 +109,7 @@ export default function AppRoutes() {
             </ProtectedRoute>
           }
         />
+
         <Route
           path="/services"
           element={
@@ -106,6 +118,7 @@ export default function AppRoutes() {
             </ProtectedRoute>
           }
         />
+
         <Route
           path="/expenses"
           element={
@@ -114,6 +127,7 @@ export default function AppRoutes() {
             </ProtectedRoute>
           }
         />
+
         <Route
           path="/maintenance"
           element={
@@ -122,6 +136,7 @@ export default function AppRoutes() {
             </ProtectedRoute>
           }
         />
+
         <Route
           path="/clients"
           element={
@@ -130,6 +145,7 @@ export default function AppRoutes() {
             </ProtectedRoute>
           }
         />
+
         <Route
           path="/suppliers"
           element={
@@ -138,6 +154,7 @@ export default function AppRoutes() {
             </ProtectedRoute>
           }
         />
+
         <Route
           path="/products"
           element={
@@ -146,6 +163,7 @@ export default function AppRoutes() {
             </ProtectedRoute>
           }
         />
+
         <Route
           path="/rewards"
           element={
@@ -154,6 +172,17 @@ export default function AppRoutes() {
             </ProtectedRoute>
           }
         />
+
+        {/* ⚡️ NUEVO: Servicios Industriales */}
+        <Route
+          path="/industrial-services"
+          element={
+            <ProtectedRoute requiredPerm="industrial_services">
+              <IndustrialServicesPage />
+            </ProtectedRoute>
+          }
+        />
+
         <Route
           path="/users"
           element={
@@ -162,21 +191,23 @@ export default function AppRoutes() {
             </ProtectedRoute>
           }
         />
+
       </Route>
 
       {/* Aliases en español */}
-      <Route path="/ventas"        element={<Navigate to="/sales" replace />} />
-      <Route path="/cobros"        element={<Navigate to="/receivables" replace />} />
-      <Route path="/compras"       element={<Navigate to="/purchases" replace />} />
-      <Route path="/inventario"    element={<Navigate to="/inventory" replace />} />
-      <Route path="/servicios"     element={<Navigate to="/services" replace />} />
-      <Route path="/mantenimiento" element={<Navigate to="/maintenance" replace />} />
-      <Route path="/clientes"      element={<Navigate to="/clients" replace />} />
-      <Route path="/proveedores"   element={<Navigate to="/suppliers" replace />} />
-      <Route path="/productos"     element={<Navigate to="/products" replace />} />
-      <Route path="/premios"       element={<Navigate to="/rewards" replace />} />
-      <Route path="/usuarios"      element={<Navigate to="/users" replace />} />
-      <Route path="/resumen"       element={<Navigate to="/summary" replace />} />
+      <Route path="/ventas"                 element={<Navigate to="/sales" replace />} />
+      <Route path="/cobros"                 element={<Navigate to="/receivables" replace />} />
+      <Route path="/compras"                element={<Navigate to="/purchases" replace />} />
+      <Route path="/inventario"             element={<Navigate to="/inventory" replace />} />
+      <Route path="/servicios"              element={<Navigate to="/services" replace />} />
+      <Route path="/servicios-industriales" element={<Navigate to="/industrial-services" replace />} />
+      <Route path="/mantenimiento"          element={<Navigate to="/maintenance" replace />} />
+      <Route path="/clientes"               element={<Navigate to="/clients" replace />} />
+      <Route path="/proveedores"            element={<Navigate to="/suppliers" replace />} />
+      <Route path="/productos"              element={<Navigate to="/products" replace />} />
+      <Route path="/premios"                element={<Navigate to="/rewards" replace />} />
+      <Route path="/usuarios"               element={<Navigate to="/users" replace />} />
+      <Route path="/resumen"                element={<Navigate to="/summary" replace />} />
 
       {/* 404 */}
       <Route path="*" element={<div className="p-6">Página no encontrada</div>} />

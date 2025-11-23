@@ -4,21 +4,22 @@ import Section from "../../components/Section";
 import Table from "../../components/Table";
 import supabase from "../../lib/supabaseClient";
 
-/** Tablas (BD) */
+/** Tabla de usuarios (BD) */
 const USERS_TABLE = "profiles";
 
 /** Catálogo de módulos (UI) */
 const ALL_MODULES = [
-  { key: "sales",        label: "Ventas" },
-  { key: "receivables",  label: "Cobros" },
-  { key: "purchases",    label: "Compras" },
-  { key: "inventory",    label: "Inventario" },
-  { key: "services",     label: "Servicios" },
-  { key: "maintenance",  label: "Mantenimiento" },
-  { key: "clients",      label: "Clientes" },
-  { key: "suppliers",    label: "Proveedores" },
-  { key: "products",     label: "Productos" },
-  { key: "rewards",      label: "Premios" },
+  { key: "sales",       label: "Ventas" },
+  { key: "receivables", label: "Cobros" },
+  { key: "purchases",   label: "Compras" },
+  { key: "inventory",   label: "Inventario" },
+  { key: "services",    label: "Servicios" },
+  { key: "maintenance", label: "Mantenimiento" },
+  { key: "clients",     label: "Clientes" },
+  { key: "suppliers",   label: "Proveedores" },
+  { key: "products",    label: "Productos" },
+  { key: "rewards",     label: "Premios" },
+  { key: "industrial",  label: "Industrial" }, // ⬅️ nuevo módulo
 ] as const;
 
 type ModuleKey = (typeof ALL_MODULES)[number]["key"];
@@ -27,7 +28,9 @@ type ModuleKey = (typeof ALL_MODULES)[number]["key"];
 type RoleUI = "manager" | "secretary";
 type RoleDB = "gerente" | "secretaria";
 
-const roleUiToDb = (r: RoleUI): RoleDB => (r === "manager" ? "gerente" : "secretaria");
+const roleUiToDb = (r: RoleUI): RoleDB =>
+  r === "manager" ? "gerente" : "secretaria";
+
 const roleDbToUi = (r: RoleDB | null | undefined): RoleUI =>
   r === "gerente" ? "manager" : "secretary";
 
@@ -41,6 +44,7 @@ interface AdminUser {
   created_at: string | null;
 }
 
+/** Helpers */
 const fmtDateTime = (iso?: string | null) => {
   if (!iso) return "—";
   try {
@@ -96,7 +100,7 @@ export default function UsersAccess() {
     }
 
     // RPC: get_user_modules(p_user uuid) -> text[]
-    const { data, error } = await supabase.rpc<'get_user_modules', string[]>(
+    const { data, error } = await supabase.rpc<"get_user_modules", string[]>(
       "get_user_modules",
       { p_user: userId }
     );
@@ -126,7 +130,10 @@ export default function UsersAccess() {
   const updateRole = async (id: string, roleUi: RoleUI) => {
     const role: RoleDB = roleUiToDb(roleUi);
     setLoading(true);
-    const { error } = await supabase.from(USERS_TABLE).update({ role }).eq("id", id);
+    const { error } = await supabase
+      .from(USERS_TABLE)
+      .update({ role })
+      .eq("id", id);
     setLoading(false);
     if (error) {
       alert("No se pudo actualizar el rol: " + error.message);
@@ -139,29 +146,41 @@ export default function UsersAccess() {
     if (!confirm("¿Suspender acceso de este usuario?")) return;
     const until = toFutureISO(100);
     setLoading(true);
-    const { error } = await supabase.from(USERS_TABLE).update({ banned_until: until }).eq("id", id);
+    const { error } = await supabase
+      .from(USERS_TABLE)
+      .update({ banned_until: until })
+      .eq("id", id);
     setLoading(false);
     if (error) {
       alert("No se pudo suspender: " + error.message);
       return;
     }
-    setUsers((prev) => prev.map((u) => (u.id === id ? { ...u, banned_until: until } : u)));
+    setUsers((prev) =>
+      prev.map((u) => (u.id === id ? { ...u, banned_until: until } : u))
+    );
   };
 
   const restoreUser = async (id: string) => {
     setLoading(true);
-    const { error } = await supabase.from(USERS_TABLE).update({ banned_until: null }).eq("id", id);
+    const { error } = await supabase
+      .from(USERS_TABLE)
+      .update({ banned_until: null })
+      .eq("id", id);
     setLoading(false);
     if (error) {
       alert("No se pudo rehabilitar: " + error.message);
       return;
     }
-    setUsers((prev) => prev.map((u) => (u.id === id ? { ...u, banned_until: null } : u)));
+    setUsers((prev) =>
+      prev.map((u) => (u.id === id ? { ...u, banned_until: null } : u))
+    );
   };
 
   /* ============= PERMISOS DE SECRETARIA (RPC) ============= */
   const toggleModule = (key: ModuleKey) => {
-    setSecModules((prev) => (prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]));
+    setSecModules((prev) =>
+      prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]
+    );
   };
 
   const saveSecretaryPerms = async () => {
@@ -170,7 +189,7 @@ export default function UsersAccess() {
     setLoading(true);
 
     // RPC: save_user_modules(p_user uuid, p_modules text[]) -> void
-    const { error } = await supabase.rpc<'save_user_modules', null>(
+    const { error } = await supabase.rpc<"save_user_modules", null>(
       "save_user_modules",
       {
         p_user: selectedSecretaryId,
@@ -215,7 +234,11 @@ export default function UsersAccess() {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
-            <button className="px-3 py-2 rounded-lg border" onClick={loadUsers} disabled={loading}>
+            <button
+              className="px-3 py-2 rounded-lg border"
+              onClick={loadUsers}
+              disabled={loading}
+            >
               Recargar
             </button>
           </div>
@@ -226,8 +249,16 @@ export default function UsersAccess() {
           rows={filteredUsers}
           emptyMessage={loading ? "Cargando usuarios..." : "Sin usuarios"}
           columns={[
-            { key: "full_name", label: "Nombre", render: (r: AdminUser) => r.full_name ?? "—" },
-            { key: "email", label: "Correo", render: (r: AdminUser) => r.email ?? "—" },
+            {
+              key: "full_name",
+              label: "Nombre",
+              render: (r: AdminUser) => r.full_name ?? "—",
+            },
+            {
+              key: "email",
+              label: "Correo",
+              render: (r: AdminUser) => r.email ?? "—",
+            },
             {
               key: "role",
               label: "Rol",
@@ -236,7 +267,9 @@ export default function UsersAccess() {
                 return (
                   <select
                     value={roleUI}
-                    onChange={(e) => updateRole(r.id, e.target.value as RoleUI)}
+                    onChange={(e) =>
+                      updateRole(r.id, e.target.value as RoleUI)
+                    }
                     className="border rounded-lg px-2 py-1"
                   >
                     <option value="manager">Gerente general</option>
@@ -321,7 +354,10 @@ export default function UsersAccess() {
         {selectedSecretaryId ? (
           <div className="grid md:grid-cols-4 gap-3">
             {ALL_MODULES.map((m) => (
-              <label key={m.key} className="flex items-center gap-2 border rounded-xl px-3 py-2">
+              <label
+                key={m.key}
+                className="flex items-center gap-2 border rounded-xl px-3 py-2"
+              >
                 <input
                   type="checkbox"
                   checked={secModules.includes(m.key)}
@@ -332,7 +368,9 @@ export default function UsersAccess() {
             ))}
           </div>
         ) : (
-          <div className="text-gray-500">Selecciona una secretaria para editar permisos.</div>
+          <div className="text-gray-500">
+            Selecciona una secretaria para editar permisos.
+          </div>
         )}
       </Section>
     </>

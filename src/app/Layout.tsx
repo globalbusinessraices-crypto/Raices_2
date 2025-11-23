@@ -4,29 +4,29 @@ import { NavLink, Outlet, useLocation, Link } from "react-router-dom";
 import usePerms, { ModuleKey } from "./hooks/usePerms";
 
 const NAV: Array<{ path: string; label: string; perm?: ModuleKey; onlyManager?: boolean }> = [
-  // 👇 Nuevo tab de resumen general
   { path: "/summary",     label: "Resumen general", perm: "summary" },
 
-  { path: "/sales",        label: "Ventas",                perm: "sales" },
-  { path: "/receivables",  label: "Cobros",                perm: "receivables" },
-  { path: "/purchases",    label: "Compras",               perm: "purchases" },
-  { path: "/expenses",     label: "Gastos",                perm: "expenses" },
-  { path: "/inventory",    label: "Inventario",            perm: "inventory" },
-  { path: "/services",     label: "Servicios",             perm: "services" },
-  { path: "/maintenance",  label: "Mantenimiento",         perm: "maintenance" },
-  { path: "/clients",      label: "Clientes",              perm: "clients" },
-  { path: "/suppliers",    label: "Proveedores",           perm: "suppliers" },
-  { path: "/products",     label: "Productos",             perm: "products" },
-  { path: "/rewards",      label: "Premios",               perm: "rewards" },
-  { path: "/users",        label: "Usuarios y permisos",   onlyManager: true },
+  { path: "/sales",        label: "Ventas",              perm: "sales" },
+  { path: "/receivables",  label: "Cobros",              perm: "receivables" },
+  { path: "/purchases",    label: "Compras",             perm: "purchases" },
+  { path: "/expenses",     label: "Gastos",              perm: "expenses" },
+  { path: "/inventory",    label: "Inventario",          perm: "inventory" },
+  { path: "/services",     label: "Servicios",           perm: "services" },
+
+  // ✅ NUEVO MÓDULO AGREGADO AL MENÚ
+  { path: "/industrial-services", label: "Serv. Industriales", perm: "industrial_services" },
+
+  { path: "/maintenance",  label: "Mantenimiento",       perm: "maintenance" },
+  { path: "/clients",      label: "Clientes",            perm: "clients" },
+  { path: "/suppliers",    label: "Proveedores",         perm: "suppliers" },
+  { path: "/products",     label: "Productos",           perm: "products" },
+  { path: "/rewards",      label: "Premios",             perm: "rewards" },
+
+  { path: "/users",        label: "Usuarios y permisos", onlyManager: true },
 ];
 
 export default function Layout() {
-  const { role, modules = [], signOut } = usePerms() as {
-    role: "manager" | "secretary";
-    modules: ModuleKey[];
-    signOut?: () => Promise<void> | void;
-  };
+  const { role, modules = [], logout } = usePerms();
 
   const location = useLocation();
   const isHome = location.pathname === "/home";
@@ -47,16 +47,19 @@ export default function Layout() {
 
   const onLogout = async () => {
     try {
-      await signOut?.();
-    } catch {}
+      await logout();
+    } catch (err) {
+      console.error("Error al cerrar sesión:", err);
+    }
   };
 
   return (
     <div className="min-h-screen bg-gray-50 text-gray-900">
-      {/* Header/tabs SOLO en interfaces (oculto en /home) */}
       {!isHome && (
         <header className="sticky top-0 z-40 border-b bg-white/95 backdrop-blur">
           <div className="mx-auto max-w-7xl px-4 py-3 flex items-center justify-between gap-4">
+
+            {/* Logo */}
             <Link to="/home" className="flex items-center gap-3">
               <div className="w-9 h-9 rounded-2xl bg-gray-900 text-white grid place-content-center font-semibold">
                 RG
@@ -67,6 +70,7 @@ export default function Layout() {
               </div>
             </Link>
 
+            {/* Rol y logout */}
             <div className="flex items-center gap-3 text-sm text-gray-600">
               <span className="hidden sm:inline">
                 Rol: <b>{role}</b>
@@ -79,13 +83,12 @@ export default function Layout() {
                 Cerrar sesión
               </button>
             </div>
+
           </div>
 
+          {/* Tabs */}
           <div className="border-t">
-            <div
-              className="mx-auto max-w-7xl px-4 py-2 overflow-x-auto"
-              aria-label="Navegación de módulos"
-            >
+            <div className="mx-auto max-w-7xl px-4 py-2 overflow-x-auto">
               <nav className="flex items-center gap-2 min-h-[40px]">
                 {visibleNav.map((tab) => (
                   <NavLink key={tab.path} to={tab.path} className={linkClass(tab.path)}>
@@ -98,10 +101,12 @@ export default function Layout() {
         </header>
       )}
 
+      {/* Contenido */}
       <main className="mx-auto max-w-7xl px-4 py-6">
         <Outlet />
       </main>
 
+      {/* Footer */}
       <footer className="border-t bg-white">
         <div className="mx-auto max-w-7xl px-4 py-3 text-xs text-gray-500">
           © {new Date().getFullYear()} Riaces – MVP conectado a Supabase.

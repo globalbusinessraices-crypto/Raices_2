@@ -13,43 +13,39 @@ export default function ProtectedRoute({ children, requiredPerm, need }: Props) 
   const location = useLocation();
   const { loading, logged, can } = usePerms();
 
-  // DEBUG LOGS
-  console.log("%c[ProtectedRoute] ===== ENTER =====", "color: #00bfff; font-weight: bold;");
-  console.log("loading:", loading);
-  console.log("logged:", logged);
-  console.log("requiredPerm:", requiredPerm);
-  console.log("need:", need);
-  console.log("module required:", need?.module ?? requiredPerm);
-  console.log("location.pathname:", location.pathname);
+  const required: ModuleKey | undefined = need?.module ?? requiredPerm;
 
-  // mientras carga permisos o sesión
+  // ===============================
+  // 🔵 1) Mientras permisos cargan
+  // ===============================
   if (loading) {
-    console.log("%c[ProtectedRoute] loading... ⏳", "color: orange;");
-    return null;
+    return (
+      <div className="w-full h-[200px] grid place-content-center text-gray-400">
+        Cargando permisos…
+      </div>
+    );
   }
 
-  // no está logueado → mandar a login
+  // ===============================
+  // 🔴 2) Usuario NO logueado
+  // ===============================
   if (!logged) {
-    console.log("%c[ProtectedRoute] NOT LOGGED → redirect /login", "color: red; font-weight: bold;");
     return <Navigate to="/login" replace state={{ from: location }} />;
   }
 
-  const required: ModuleKey | undefined = need?.module ?? requiredPerm;
-
-  if (required) {
-    const allowed = can(required);
-    console.log("Checking perm:", required, "→ allowed:", allowed);
-
-    if (!allowed) {
-      console.log("%c[ProtectedRoute] NO PERMISSION ❌", "color: red; font-weight: bold;");
-      return (
-        <div className="p-6 text-red-600">
-          No tienes permiso para acceder a este módulo.
-        </div>
-      );
-    }
+  // ===============================
+  // 🟡 3) Validación de módulo
+  // ===============================
+  if (required && !can(required)) {
+    return (
+      <div className="p-6 text-red-600">
+        No tienes permiso para acceder a este módulo.
+      </div>
+    );
   }
 
-  console.log("%c[ProtectedRoute] ACCESS GRANTED ✔", "color: green; font-weight: bold;");
+  // ===============================
+  // 🟢 4) OK → renderizar hijos
+  // ===============================
   return <>{children}</>;
 }

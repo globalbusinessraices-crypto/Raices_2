@@ -19,7 +19,6 @@ const monthStartISO = (d = new Date()) => {
   return x.toISOString().slice(0, 10);
 };
 
-// paleta de colores estable
 const COLORS = [
   "#FF5733","#33FF57","#3357FF","#FF33A1","#A133FF","#33FFA1",
   "#FFC300","#00BFFF","#FFD700","#DA70D6","#8A2BE2","#7FFF00",
@@ -62,8 +61,10 @@ export default function Expenses() {
       .lte("date", dateTo)
       .order("date", { ascending: false })
       .order("id", { ascending: false });
+
     if (error) alert("Error cargando gastos: " + error.message);
     else setRows(data || []);
+
     setLoading(false);
   };
 
@@ -87,23 +88,32 @@ export default function Expenses() {
 
   const save = async () => {
     if (!canSave) return alert("Completa fecha, categoría y un monto válido (> 0).");
+
+    // 🔥 Si necesitas created_by, actívalo aquí:
+    const user = await supabase.auth.getUser();
+    
     const payload = {
       date: form.date,
       category: form.category.trim(),
       description: form.description?.trim() || null,
       amount: Number(form.amount),
+      created_by: user.data.user.id, // <-- Activa si RLS lo requiere
     };
+
     const { data, error } = await supabase
       .from("expenses")
       .insert([payload])
       .select("id, date, category, description, amount")
       .single();
+
     if (error) return alert("No se pudo registrar: " + error.message);
 
-    // si cae en el rango actual, agregamos sin recargar
     if (payload.date >= dateFrom && payload.date <= dateTo) {
-      setRows((prev) => [data, ...prev].sort((a, b) => new Date(b.date) - new Date(a.date) || b.id - a.id));
+      setRows((prev) =>
+        [data, ...prev].sort((a, b) => new Date(b.date) - new Date(a.date) || b.id - a.id)
+      );
     }
+
     setForm({ date: todayISO(), category: "", description: "", amount: "" });
   };
 
@@ -116,7 +126,8 @@ export default function Expenses() {
 
   return (
     <Section title="Análisis y Registro de Gastos">
-      {/* FILA 1: Filtros + total / Gráfico */}
+
+      {/* FILA 1: Filtros + total / gráfico */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {/* Izquierda */}
         <div className="space-y-6">
@@ -125,11 +136,14 @@ export default function Expenses() {
             <div className="space-y-3">
               <label className="flex flex-col">
                 <span className="text-xs text-gray-500">Desde</span>
-                <input type="date" className="border rounded-xl px-3 py-2" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
+                <input type="date" className="border rounded-xl px-3 py-2"
+                  value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
               </label>
+
               <label className="flex flex-col">
                 <span className="text-xs text-gray-500">Hasta</span>
-                <input type="date" className="border rounded-xl px-3 py-2" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
+                <input type="date" className="border rounded-xl px-3 py-2"
+                  value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
               </label>
             </div>
           </div>
@@ -141,10 +155,11 @@ export default function Expenses() {
           </div>
         </div>
 
-        {/* Derecha: Gráfico */}
+        {/* Derecha: gráfico */}
         <div className="md:col-span-2">
           <div className="rounded-2xl border border-slate-200 bg-white shadow-sm p-4">
             <h3 className="font-semibold mb-2">Gasto por categoría</h3>
+
             {loading ? (
               <div className="h-72 grid place-content-center text-gray-500">Cargando…</div>
             ) : chartData.length === 0 ? (
@@ -152,8 +167,11 @@ export default function Expenses() {
             ) : (
               <ResponsiveContainer width="100%" height={300}>
                 <PieChart>
-                  <Pie data={chartData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={110} labelLine={false}>
-                    {chartData.map((entry, i) => <Cell key={i} fill={categoryColor(entry.name)} />)}
+                  <Pie data={chartData} dataKey="value" nameKey="name"
+                    cx="50%" cy="50%" outerRadius={110} labelLine={false}>
+                    {chartData.map((entry, i) => (
+                      <Cell key={i} fill={categoryColor(entry.name)} />
+                    ))}
                   </Pie>
                   <Tooltip content={<CustomTooltip />} />
                   <Legend
@@ -176,32 +194,49 @@ export default function Expenses() {
       <div className="mt-6">
         <div className="rounded-2xl border border-slate-200 bg-white shadow-sm p-4">
           <h3 className="font-semibold mb-3 text-lg">Registrar nuevo gasto</h3>
+
           <div className="grid md:grid-cols-5 gap-3">
             <label className="flex flex-col">
               <span className="text-xs text-gray-500">Fecha</span>
-              <input type="date" className="border rounded-xl px-3 py-2" value={form.date} onChange={(e) => setForm((f) => ({ ...f, date: e.target.value }))} />
+              <input type="date"
+                className="border rounded-xl px-3 py-2"
+                value={form.date}
+                onChange={(e) => setForm((f) => ({ ...f, date: e.target.value }))} />
             </label>
 
             <label className="flex flex-col md:col-span-2">
               <span className="text-xs text-gray-500">Categoría</span>
-              <select className="border rounded-xl px-3 py-2" value={form.category} onChange={(e) => setForm((f) => ({ ...f, category: e.target.value }))}>
+              <select className="border rounded-xl px-3 py-2"
+                value={form.category}
+                onChange={(e) => setForm((f) => ({ ...f, category: e.target.value }))}>
                 <option value="" disabled>Selecciona una categoría</option>
-                {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
+                {CATEGORIES.map((c) => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
               </select>
             </label>
 
             <label className="flex flex-col">
               <span className="text-xs text-gray-500">Monto (S/)</span>
-              <input type="number" step="0.01" min="0" className="border rounded-xl px-3 py-2" value={form.amount} onChange={(e) => setForm((f) => ({ ...f, amount: e.target.value }))} />
+              <input type="number" step="0.01" min="0"
+                className="border rounded-xl px-3 py-2"
+                value={form.amount}
+                onChange={(e) => setForm((f) => ({ ...f, amount: e.target.value }))} />
             </label>
 
             <label className="flex flex-col">
               <span className="text-xs text-gray-500">Detalle (opcional)</span>
-              <input className="border rounded-xl px-3 py-2" placeholder="N° comprobante…" value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} />
+              <input className="border rounded-xl px-3 py-2" placeholder="N° comprobante…"
+                value={form.description}
+                onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} />
             </label>
 
             <div className="md:col-span-5">
-              <button onClick={save} disabled={!canSave} className="px-4 py-2 rounded-xl bg-gray-900 text-white disabled:opacity-60">
+              <button
+                onClick={save}
+                disabled={!canSave}
+                className="px-4 py-2 rounded-xl bg-gray-900 text-white disabled:opacity-60"
+              >
                 Registrar gasto
               </button>
             </div>
@@ -220,20 +255,34 @@ export default function Expenses() {
               render: (r) => (
                 <span
                   className="px-2.5 py-1 rounded-full text-xs font-medium"
-                  style={{ backgroundColor: `${categoryColor(r.category)}20`, color: categoryColor(r.category) }}
+                  style={{
+                    backgroundColor: `${categoryColor(r.category)}20`,
+                    color: categoryColor(r.category),
+                  }}
                 >
                   {r.category}
                 </span>
               ),
             },
             { key: "description", label: "Detalle" },
-            { key: "amount", label: "Monto", render: (r) => <div className="text-right font-mono">{currency(r.amount)}</div> },
+            {
+              key: "amount",
+              label: "Monto",
+              render: (r) => (
+                <div className="text-right font-mono">{currency(r.amount)}</div>
+              ),
+            },
             {
               key: "acciones",
               label: "",
               render: (r) => (
                 <div className="flex gap-2 justify-end">
-                  <button onClick={() => remove(r.id)} className="px-2 py-1 rounded-lg border text-red-600 hover:bg-red-50 text-xs">Eliminar</button>
+                  <button
+                    onClick={() => remove(r.id)}
+                    className="px-2 py-1 rounded-lg border text-red-600 hover:bg-red-50 text-xs"
+                  >
+                    Eliminar
+                  </button>
                 </div>
               ),
             },
